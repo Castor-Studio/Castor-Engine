@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Castor.Engine.Tests/Castor.Engine.Tests.csproj" Id="24314e6c-0e43-4c88-a1e8-816dfbbc0fc7" />
+  <Project Path="Castor.Engine/Castor.Engine.csproj" />
+</Solution>
