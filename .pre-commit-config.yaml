@@ -1,0 +1,36 @@
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: clang-format
+        name: Check C/C++ formatting
+        entry: clang-format --dry-run --Werror
+        language: system
+        files: \.(c|cc|cpp|cxx|h|hh|hpp|hxx)$
+
+      - id: dotnet-format
+        name: Check C# formatting
+        entry: dotnet format Castor-Engine.slnx --verify-no-changes --no-restore --include
+        language: system
+        files: \.cs$
+        require_serial: true
+
+      - id: clang-tidy
+        name: Analyze C/C++ with clang-tidy
+        entry: clang-tidy -p build/windows-x64-lint
+        language: system
+        files: \.(c|cc|cpp|cxx)$
+        require_serial: true
+        stages:
+          - pre-push
