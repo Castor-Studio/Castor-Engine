@@ -7,16 +7,50 @@ on:
       - main
       - dev
 
+permissions:
+  contents: read
+
 jobs:
-  build-and-test:
+  lint:
+    name: Lint
     runs-on: windows-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@6
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8
+
+      - name: Verify tools
+        shell: pwsh
+        run: |
+          dotnet --version
+          uv --version
+          clang-format --version
+          clang-tidy --version
+
+      - name: Restore .NET
+        run: dotnet restore Castor-Engine.sln
+
+      - name: Run pre-commit checks
+        run: uvx pre-commit run --all-files --show-diff-on-failure
+
+  build-and-test:
+    name: Build and test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@6
         with:
           dotnet-version: 8.0.x
 
