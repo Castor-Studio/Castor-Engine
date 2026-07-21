@@ -67,17 +67,38 @@ jobs:
             -Target x64 `
             -Configuration RelWithDebInfo
 
+      - name: Install OBS development files
+        shell: pwsh
+        run: |
+          $buildRoot = "$env:GITHUB_WORKSPACE\_obs\build_x64"
+          $installRoot = "$buildRoot\install"
+
+          cmake --install $buildRoot `
+            --config RelWithDebInfo `
+            --component Development `
+            --prefix $installRoot
+
       - name: Validate OBS installation
         shell: pwsh
         run: |
           $installRoot = "$env:GITHUB_WORKSPACE\_obs\build_x64\install"
 
-          if (!(Test-Path $installRoot)) {
-            throw "OBS installation was not generated: $installRoot"
-          }
+          $requiredFiles = @(
+            "$installRoot\bin\64bit\obs.dll",
+            "$installRoot\include\obs.h",
+            "$installRoot\include\obsconfig.h",
+            "$installRoot\lib\obs.lib",
+            "$installRoot\cmake\libobsConfig.cmake",
+            "$installRoot\cmake\libobsTargets.cmake"
+          )
 
-          Get-ChildItem $installRoot -Recurse |
-            Select-Object FullName
+          foreach ($file in $requiredFiles) {
+            if (!(Test-Path $file)) {
+              throw "Required OBS SDK file was not generated: $file"
+            }
+
+            Write-Host "Found: $file"
+          }
 
       - name: Upload OBS installation
         uses: actions/upload-artifact@v4
