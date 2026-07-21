@@ -1,0 +1,88 @@
+name: Build OBS SDK
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - build/obs-sdk-bootstrap
+    paths:
+      - .github/workflows/build-obs-sdk.yml
+      - .github/scripts/**
+      - cmake/dependencies/CastorObsSdkVersion.cmake
+      - sdk/obs/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: obs-sdk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows-x64:
+    name: Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout Castor Engine
+        uses: actions/checkout@v4
+
+      - name: Read OBS version
+        id: versions
+        shell: pwsh
+        run: |
+          $contents = Get-Content `
+            "cmake/dependencies/CastorObsSdkVersion.cmake" `
+            -Raw
+
+          $match = [regex]::Match(
+            $contents,
+            'set\s*\(\s*CASTOR_OBS_VERSION\s*"([^"]+)"\s*\)'
+          )
+
+          if (!$match.Success) {
+            throw "CASTOR_OBS_VERSION was not found."
+          }
+
+          $obsVersion = $match.Groups[1].Value
+
+          Write-Host "OBS version: $obsVersion"
+          "obs-version=$obsVersion" >> $env:GITHUB_OUTPUT
+
+      - name: Checkout OBS Studio
+        uses: actions/checkout@v4
+        with:
+          repository: obsproject/obs-studio
+          ref: ${{ steps.versions.outputs.obs-version }}
+          path: _obs
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Build and install OBS Studio
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\_obs\.github\scripts\Build-Windows.ps1" `
+            -Target x64 `
+            -Configuration RelWithDebInfo
+
+      - name: Validate OBS installation
+        shell: pwsh
+        run: |
+          $installRoot = "$env:GITHUB_WORKSPACE\_obs\build_x64\install"
+
+          if (!(Test-Path $installRoot)) {
+            throw "OBS installation was not generated: $installRoot"
+          }
+
+          Get-ChildItem $installRoot -Recurse |
+            Select-Object FullName
+
+      - name: Upload OBS installation
+        uses: actions/upload-artifact@v4
+        with:
+          name: obs-install-win-x64-${{ steps.versions.outputs.obs-version }}
+          path: _obs/build_x64/install
+          if-no-files-found: error
+          retention-days: 7
