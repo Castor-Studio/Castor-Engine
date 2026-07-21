@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout Castor Engine
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Read OBS version
         id: versions
@@ -52,7 +52,7 @@ jobs:
           "obs-version=$obsVersion" >> $env:GITHUB_OUTPUT
 
       - name: Checkout OBS Studio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: obsproject/obs-studio
           ref: ${{ steps.versions.outputs.obs-version }}
@@ -100,10 +100,23 @@ jobs:
             Write-Host "Found: $file"
           }
 
-      - name: Upload OBS installation
-        uses: actions/upload-artifact@v4
+      - name: Package Castor OBS SDK
+        id: package
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\.github\scripts\Package-ObsSdk.ps1" `
+            -ObsInstallRoot "$env:GITHUB_WORKSPACE\_obs\build_x64\install" `
+            -ObsSourceRoot "$env:GITHUB_WORKSPACE\_obs" `
+            -OutputDirectory "$env:GITHUB_WORKSPACE\artifacts\obs-sdk" `
+            -Configuration "RelWithDebInfo"
+
+      - name: Upload Castor OBS SDK
+        uses: actions/upload-artifact@v7
         with:
-          name: obs-install-win-x64-${{ steps.versions.outputs.obs-version }}
-          path: _obs/build_x64/install
+          name: castor-obs-sdk-${{ steps.versions.outputs.obs-version }}-win-x64
+          path: |
+            ${{ steps.package.outputs['archive-path'] }}
+            ${{ steps.package.outputs['checksum-path'] }}
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 30
+          compression-level: 0
