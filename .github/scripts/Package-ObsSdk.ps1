@@ -331,7 +331,10 @@ $plugins = @(
     "image-source",
     "obs-filters",
     "obs-transitions",
-    "rtmp-services"
+    "rtmp-services",
+    "obs-scripting.dll",
+    "lua51.dll",
+    "datachannel.dll"
 )
 
 foreach ($plugin in $plugins) {
