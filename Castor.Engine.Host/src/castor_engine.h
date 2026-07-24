@@ -3,13 +3,13 @@
 #include <stdint.h>
 
 #if defined(_WIN32)
-    #if defined(CASTOR_ENGINE_HOST_EXPORTS)
-        #define CASTOR_ENGINE_API __declspec(dllexport)
-    #else
-        #define CASTOR_ENGINE_API __declspec(dllimport)
-    #endif
+#if defined(CASTOR_ENGINE_HOST_EXPORTS)
+#define CASTOR_ENGINE_API __declspec(dllexport)
 #else
-    #define CASTOR_ENGINE_API
+#define CASTOR_ENGINE_API __declspec(dllimport)
+#endif
+#else
+#define CASTOR_ENGINE_API
 #endif
 
 #ifdef __cplusplus
@@ -21,7 +21,9 @@ extern "C" {
 
 CASTOR_ENGINE_API uint32_t castor_engine_get_abi_version(void);
 
-CASTOR_ENGINE_API const char* castor_engine_get_version(void);
+CASTOR_ENGINE_API const char *castor_engine_get_obs_version(void);
+
+CASTOR_ENGINE_API const char *castor_engine_get_version(void);
 
 #ifdef __cplusplus
 }

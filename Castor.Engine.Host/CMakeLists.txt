@@ -20,6 +20,12 @@ target_compile_features(
         cxx_std_20
 )
 
+target_link_libraries(
+    Castor.Engine.Host
+    PRIVATE
+        OBS::libobs
+)
+
 set_target_properties(
     Castor.Engine.Host
     PROPERTIES
@@ -31,4 +37,19 @@ install(
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION bin
     ARCHIVE DESTINATION lib
+)
+
+install(
+    DIRECTORY "${CASTOR_OBS_SDK_ROOT}/runtime/bin/64bit/"
+    DESTINATION bin
+)
+
+install(
+    DIRECTORY "${CASTOR_OBS_SDK_ROOT}/runtime/obs-plugins/"
+    DESTINATION obs-plugins
+)
+
+install(
+    DIRECTORY "${CASTOR_OBS_SDK_ROOT}/runtime/data/"
+    DESTINATION data
 )

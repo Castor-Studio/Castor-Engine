@@ -13,4 +13,9 @@ project(
 
 enable_testing()
 
+include(cmake/dependencies/CastorObsSdkVersion.cmake)
+include(cmake/dependencies/BootstrapCastorObsSdk.cmake)
+
+castor_bootstrap_obs_sdk()
+
 add_subdirectory(Castor.Engine.Host)
