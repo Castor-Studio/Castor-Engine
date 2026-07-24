@@ -279,7 +279,10 @@ $excludedRuntimeDllPatterns = @(
     "libcef.dll",
     "chrome_elf.dll",
     "obs-frontend-api.dll",
-    "obs-websocket-api.dll"
+    "obs-websocket-api.dll",
+    "obs-scripting.dll",
+    "lua51.dll",
+    "datachannel.dll"
 )
 
 Get-ChildItem `
@@ -331,10 +334,7 @@ $plugins = @(
     "image-source",
     "obs-filters",
     "obs-transitions",
-    "rtmp-services",
-    "obs-scripting.dll",
-    "lua51.dll",
-    "datachannel.dll"
+    "rtmp-services"
 )
 
 foreach ($plugin in $plugins) {
