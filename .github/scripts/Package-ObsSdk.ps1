@@ -351,9 +351,27 @@ foreach ($plugin in $plugins) {
         "data\obs-plugins\$plugin"
 
     if (Test-Path -LiteralPath $pluginData -PathType Container) {
+        $pluginDataDestination = Join-Path `
+            $runtimeDataRoot `
+            "obs-plugins\$plugin"
+
         Copy-DirectoryContents `
             -Source $pluginData `
-            -Destination (Join-Path $runtimeDataRoot "obs-plugins\$plugin")
+            -Destination $pluginDataDestination
+
+        # Plugin data may contain debugging symbols for helper binaries.
+        Get-ChildItem `
+            -LiteralPath $pluginDataDestination `
+            -Recurse `
+            -File `
+            -Filter "*.pdb" |
+            ForEach-Object {
+                Write-Host "Excluding plugin debug symbol: $($_.FullName)"
+
+                Remove-Item `
+                    -LiteralPath $_.FullName `
+                    -Force
+            }
     }
 }
 
