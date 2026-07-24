@@ -105,9 +105,9 @@ jobs:
       - name: Verify libobs linkage
         shell: pwsh
         run: |
-          $host = "artifacts/runtime/win-x64/bin/Castor.Engine.Host.dll"
+          $hostDll = "artifacts/runtime/win-x64/bin/Castor.Engine.Host.dll"
 
-          if (!(Test-Path -LiteralPath $host -PathType Leaf)) {
+          if (!(Test-Path -LiteralPath $hostDll -PathType Leaf)) {
             throw "Castor.Engine.Host.dll was not installed."
           }
 
@@ -139,7 +139,7 @@ jobs:
             throw "dumpbin.exe was not found: $dumpbin"
           }
 
-          $dependencies = & $dumpbin /dependents $host | Out-String
+          $dependencies = & $dumpbin /dependents $hostDll | Out-String
           Write-Host $dependencies
 
           if ($dependencies -notmatch '(?im)^\s*obs\.dll\s*$') {
