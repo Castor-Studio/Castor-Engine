@@ -69,11 +69,26 @@ function(castor_bootstrap_obs_sdk)
         endif()
 
         if(NOT archive_path)
-            message(FATAL_ERROR
-                "The Castor OBS SDK is not available. "
-                "Set CASTOR_OBS_SDK_ARCHIVE_PATH to "
-                "${CASTOR_OBS_SDK_ARCHIVE_NAME}."
+            set(
+                default_archive_path
+                "${CMAKE_SOURCE_DIR}/artifacts/obs-sdk-release/${CASTOR_OBS_SDK_ARCHIVE_NAME}"
             )
+
+            if(EXISTS "${default_archive_path}")
+                set(archive_path "${default_archive_path}")
+
+                message(
+                    STATUS
+                    "Using Castor OBS SDK archive: ${archive_path}"
+                )
+            else()
+                message(
+                    FATAL_ERROR
+                    "The Castor OBS SDK is not available.\n"
+                    "Expected archive: ${default_archive_path}\n"
+                    "Alternatively, set CASTOR_OBS_SDK_ARCHIVE_PATH."
+                )
+            endif()
         endif()
 
         get_filename_component(

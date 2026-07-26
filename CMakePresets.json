@@ -1,23 +1,33 @@
-﻿{
-    "version": 6,
-    "configurePresets": [
-        {
-            "name": "windows-x64",
-            "displayName": "Castor Engine - Windows x64",
-            "generator": "Ninja Multi-Config",
-            "binaryDir": "${sourceDir}/build/windows-x64"
-        }
-    ],
-    "buildPresets": [
-        {
-            "name": "windows-x64-debug",
-            "configurePreset": "windows-x64",
-            "configuration": "Debug"
-        },
-        {
-            "name": "windows-x64-release",
-            "configurePreset": "windows-x64",
-            "configuration": "Release"
-        }
-    ]
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "windows-x64",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build/windows-x64",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "toolset": {
+        "value": "host=x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-x64-debug",
+      "configurePreset": "windows-x64",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-x64-release",
+      "configurePreset": "windows-x64",
+      "configuration": "Release"
+    }
+  ]
 }
