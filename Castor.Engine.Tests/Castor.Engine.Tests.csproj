@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+	
+	<ItemGroup>
+	  <ProjectReference Include="..\Castor.Engine\Castor.Engine.csproj" />
+	</ItemGroup>
+
+
+	<PropertyGroup>
+		<CastorRuntimeRoot>$(MSBuildThisFileDirectory)..\artifacts\runtime\win-x64</CastorRuntimeRoot>
+		<CastorHostPath>$(CastorRuntimeRoot)\bin\Castor.Engine.Host.dll</CastorHostPath>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None
+		  Include="$(CastorHostPath)"
+		  Condition="Exists('$(CastorHostPath)')">
+			<Link>Castor.Engine.Host.dll</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<Target Name="ValidateCastorHostRuntime" BeforeTargets="Build">
+		<Error
+		  Condition="!Exists('$(CastorHostPath)')"
+		  Text="Castor.Engine.Host.dll was not found at: $(CastorHostPath). Build and install the native engine first." />
+	</Target>
+
+</Project>
