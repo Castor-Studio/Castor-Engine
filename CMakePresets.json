@@ -3,31 +3,38 @@
   "configurePresets": [
     {
       "name": "windows-x64",
-      "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceDir}/build/windows-x64",
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
+      "displayName": "Windows x64",
+      "description": "Default Windows build (x64)",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       },
-      "toolset": {
-        "value": "host=x64",
-        "strategy": "external"
+      "architecture": "x64,version=10.0.26100.0",
+      "binaryDir": "${sourceDir}/build_x64",
+      "generator": "Visual Studio 18 2026"
+    },
+    {
+      "name": "windows-ci-x64",
+      "displayName": "Windows x64 (CI)",
+      "description": "CI Windows build (x64)",
+      "inherits": [ "windows-x64" ],
+      "warnings": {
+        "dev": true,
+        "deprecated": true
       },
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": true
+        "CMAKE_COMPILE_WARNING_AS_ERROR": true
       }
     }
   ],
   "buildPresets": [
     {
-      "name": "windows-x64-debug",
+      "name": "windows-x64",
       "configurePreset": "windows-x64",
-      "configuration": "Debug"
-    },
-    {
-      "name": "windows-x64-release",
-      "configurePreset": "windows-x64",
-      "configuration": "Release"
+      "displayName": "Windows x64",
+      "description": "Windows build for x64 (aka 64-bit)",
+      "configuration": "RelWithDebInfo"
     }
   ]
 }
