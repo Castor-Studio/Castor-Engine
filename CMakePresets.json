@@ -4,8 +4,7 @@
         {
             "name": "windows-x64",
             "displayName": "Castor Engine - Windows x64",
-            "generator": "Visual Studio 17 2022",
-            "architecture": "x64",
+            "generator": "Ninja Multi-Config",
             "binaryDir": "${sourceDir}/build/windows-x64"
         }
     ],
