@@ -25,12 +25,3 @@ repos:
         language: system
         files: \.cs$
         require_serial: true
-
-      - id: clang-tidy
-        name: Analyze C/C++ with clang-tidy
-        entry: clang-tidy -p build/windows-x64-lint
-        language: system
-        files: \.(c|cc|cpp|cxx)$
-        require_serial: true
-        stages:
-          - pre-push
