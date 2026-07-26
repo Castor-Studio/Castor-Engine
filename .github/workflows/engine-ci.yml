@@ -133,14 +133,14 @@ jobs:
         env:
           CASTOR_OBS_SDK_ARCHIVE_PATH: >-
             ${{ steps.download-obs-sdk.outputs.archive-path }}
-        run: cmake --fresh --preset windows-x64
+        run: cmake --preset windows-ci-x64 --fresh
 
       - name: Build engine
-        run: cmake --build --preset windows-x64-release
+        run: cmake --build --preset windows-x64
 
       - name: Install engine
         run: >
-          cmake --install build/windows-x64
+          cmake --install build_x64/windows-x64
           --config Release
           --prefix artifacts/runtime/win-x64
 
