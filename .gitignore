@@ -88,6 +88,11 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 build
+build_x86
+build_x64
+build_arm64
+build_ubuntu
+build_macos
 
 ### CMake Patch ###
 CMakeUserPresets.json
