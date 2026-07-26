@@ -13,17 +13,18 @@
 #endif
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #define CASTOR_ENGINE_ABI_VERSION 1
 #define CASTOR_ENGINE_VERSION "0.1.0-alpha.1"
 
-CASTOR_ENGINE_API uint32_t castor_engine_get_abi_version(void);
+    CASTOR_ENGINE_API uint32_t castor_engine_get_abi_version(void);
 
-CASTOR_ENGINE_API const char *castor_engine_get_obs_version(void);
+    CASTOR_ENGINE_API const char* castor_engine_get_obs_version(void);
 
-CASTOR_ENGINE_API const char *castor_engine_get_version(void);
+    CASTOR_ENGINE_API const char* castor_engine_get_version(void);
 
 #ifdef __cplusplus
 }
