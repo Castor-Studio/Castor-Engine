@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using Castor.Engine.Interop;
 
 namespace Castor.Engine
