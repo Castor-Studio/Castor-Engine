@@ -275,12 +275,14 @@ It performs the normal consumer path:
 2. Derive the release tag and archive name.
 3. Download the exact ZIP from the matching GitHub Release.
 4. pass the archive through `CASTOR_OBS_SDK_ARCHIVE_PATH`;
-5. run a fresh CMake configuration;
+5. run a fresh CMake configuration with the `windows-ci-x64` preset;
 6. build and install the native engine and OBS runtime;
 7. restore, build, and run the managed tests.
 
 `cmake --fresh` is important when switching SDK versions because it prevents a
-previous CMake cache from selecting an older extracted SDK.
+previous CMake cache from selecting an older extracted SDK. The current Windows
+presets write native build output to `build_x64`, and the build preset uses the
+`RelWithDebInfo` configuration.
 
 The CMake bootstrap recalculates the archive SHA-256 during configuration.
 Therefore, downloading an asset with the correct name is not sufficient: its
@@ -292,7 +294,8 @@ contents must also match the checksum committed in the engine branch.
 
 Use Windows x64 with:
 
-- Visual Studio 2022 and the MSVC x64 toolchain;
+- Visual Studio 2026 and the MSVC x64 toolchain used by the current
+  `windows-x64` CMake preset;
 - CMake 3.25 or later;
 - .NET SDK 8;
 - GitHub CLI authenticated for the repository.
@@ -379,19 +382,20 @@ explicit check here produces a clearer error before the native build starts.
 Pass the ZIP directly to CMake. Do not extract it manually:
 
 ```powershell
-cmake --fresh --preset windows-x64 `
+cmake --preset windows-x64 --fresh `
   "-DCASTOR_OBS_SDK_ARCHIVE_PATH=$sdkArchive"
 
-cmake --build --preset windows-x64-release
+cmake --build --preset windows-x64
 
-cmake --install build/windows-x64 `
-  --config Release `
+cmake --install build_x64 `
+  --config RelWithDebInfo `
   --prefix artifacts/runtime/win-x64
 ```
 
 The configure step validates and extracts the SDK under the CMake build
-directory. The install step assembles `Castor.Engine.Host.dll`, the OBS runtime
-DLLs, plugins, and data under `artifacts/runtime/win-x64`.
+directory, currently `build_x64/_deps`. The install step assembles
+`Castor.Engine.Host.dll`, the OBS runtime DLLs, plugins, and data under
+`artifacts/runtime/win-x64`.
 
 ### 4. Run the managed integration tests
 
