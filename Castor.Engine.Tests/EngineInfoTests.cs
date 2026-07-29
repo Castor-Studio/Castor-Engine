@@ -3,7 +3,7 @@ namespace Castor.Engine.Tests
     public sealed class EngineInfoTests
     {
         [Fact]
-        public void AbiVersion_ShouldBeSupported()
+        public void AbiVersionShouldBeSupported()
         {
             Assert.Equal(
                 EngineInfo.SupportedAbiVersion,
@@ -11,7 +11,7 @@ namespace Castor.Engine.Tests
         }
 
         [Fact]
-        public void Version_ShouldMatchInitialVersion()
+        public void VersionShouldMatchInitialVersion()
         {
             Assert.Equal(
                 "0.1.0-alpha.1",
@@ -19,7 +19,7 @@ namespace Castor.Engine.Tests
         }
 
         [Fact]
-        public void ValidateCompatibility_ShouldNotThrow()
+        public void ValidateCompatibilityShouldNotThrow()
         {
             var exception = Record.Exception(
                 EngineInfo.ValidateCompatibility);
@@ -28,7 +28,7 @@ namespace Castor.Engine.Tests
         }
 
         [Fact]
-        public void ObsVersion_ShouldBeAvailable()
+        public void ObsVersionShouldBeAvailable()
         {
             Assert.False(
                 string.IsNullOrWhiteSpace(EngineInfo.ObsVersion));
