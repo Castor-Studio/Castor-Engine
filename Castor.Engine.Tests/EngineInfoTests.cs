@@ -26,5 +26,12 @@ namespace Castor.Engine.Tests
 
             Assert.Null(exception);
         }
+
+        [Fact]
+        public void ObsVersion_ShouldBeAvailable()
+        {
+            Assert.False(
+                string.IsNullOrWhiteSpace(EngineInfo.ObsVersion));
+        }
     }
 }

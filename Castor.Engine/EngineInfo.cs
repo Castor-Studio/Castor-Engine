@@ -28,6 +28,24 @@ namespace Castor.Engine
             }
         }
 
+        public static string ObsVersion
+        {
+            get
+            {
+                var pointer = NativeMethods.GetObsVersion();
+
+                if (pointer == nint.Zero)
+                {
+                    throw new InvalidOperationException(
+                        "OBS returned an invalid version.");
+                }
+
+                return Marshal.PtrToStringUTF8(pointer)
+                    ?? throw new InvalidOperationException(
+                        "OBS returned an invalid UTF-8 string.");
+            }
+        }
+
         public static void ValidateCompatibility()
         {
             var actualVersion = AbiVersion;

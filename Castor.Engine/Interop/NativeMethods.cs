@@ -18,5 +18,11 @@ namespace Castor.Engine.Interop
             EntryPoint = "castor_engine_get_version")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial nint GetVersion();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_obs_version")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial nint GetObsVersion();
     }
 }
