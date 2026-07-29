@@ -1,0 +1,164 @@
+name: Engine CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - dev
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8.0.0
+
+      - name: Verify tools
+        shell: pwsh
+        run: |
+          dotnet --version
+          uv --version
+          clang-format --version
+          clang-tidy --version
+
+      - name: Restore .NET
+        run: dotnet restore Castor-Engine.slnx
+
+      - name: Run pre-commit checks
+        run: uvx pre-commit run --all-files --show-diff-on-failure
+
+  build-and-test:
+    name: Build and test Windows x64
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Read OBS SDK metadata
+        id: obs-sdk
+        shell: pwsh
+        run: |
+          $contents = Get-Content `
+            "cmake/dependencies/CastorObsSdkVersion.cmake" `
+            -Raw
+
+          function Get-CMakeValue([string] $name) {
+            $pattern = (
+              'set\s*\(\s*' +
+              [regex]::Escape($name) +
+              '\s*"([^"]+)"\s*\)'
+            )
+
+            $match = [regex]::Match($contents, $pattern)
+
+            if (!$match.Success) {
+              throw "$name was not found."
+            }
+
+            return $match.Groups[1].Value
+          }
+
+          $obsVersion = Get-CMakeValue "CASTOR_OBS_VERSION"
+          $revision = Get-CMakeValue "CASTOR_OBS_SDK_REVISION"
+          $platform = Get-CMakeValue "CASTOR_OBS_SDK_PLATFORM"
+
+          $sdkVersion = "$obsVersion-castor.$revision"
+          $archiveName = "Castor.Obs.Sdk.$platform-$sdkVersion.zip"
+
+          Write-Host "OBS SDK release: $sdkVersion"
+          Write-Host "OBS SDK archive: $archiveName"
+
+          "release-tag=$sdkVersion" >> $env:GITHUB_OUTPUT
+          "archive-name=$archiveName" >> $env:GITHUB_OUTPUT
+
+      - name: Download released OBS SDK
+        id: download-obs-sdk
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.obs-sdk.outputs.release-tag }}
+          ARCHIVE_NAME: ${{ steps.obs-sdk.outputs.archive-name }}
+        run: |
+          $destination = Join-Path `
+            $env:GITHUB_WORKSPACE `
+            "artifacts/obs-sdk-release"
+
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            $destination | Out-Null
+
+          gh release download $env:RELEASE_TAG `
+            --repo $env:GH_REPO `
+            --pattern $env:ARCHIVE_NAME `
+            --dir $destination `
+            --clobber
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to download OBS SDK release $env:RELEASE_TAG."
+          }
+
+          $archivePath = Join-Path $destination $env:ARCHIVE_NAME
+
+          if (!(Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+            throw "OBS SDK archive was not downloaded: $archivePath"
+          }
+
+          "archive-path=$archivePath" >> $env:GITHUB_OUTPUT
+
+      - name: Configure engine
+        shell: pwsh
+        env:
+          CASTOR_OBS_SDK_ARCHIVE_PATH: >-
+            ${{ steps.download-obs-sdk.outputs.archive-path }}
+        run: cmake --preset windows-ci-x64 --fresh
+
+      - name: Build engine
+        run: cmake --build --preset windows-x64
+
+      - name: Install engine
+        run: >
+          cmake --install build_x64
+          --config RelWithDebInfo
+          --prefix artifacts/runtime/win-x64
+
+      - name: Restore .NET
+        run: >
+          dotnet restore
+          Castor.Engine.Tests/Castor.Engine.Tests.csproj
+
+      - name: Build .NET
+        run: >
+          dotnet build
+          Castor.Engine.Tests/Castor.Engine.Tests.csproj
+          --configuration Release
+          --no-restore
+
+      - name: Test .NET
+        run: >
+          dotnet test
+          Castor.Engine.Tests/Castor.Engine.Tests.csproj
+          --configuration Release
+          --no-build

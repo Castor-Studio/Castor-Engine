@@ -1,0 +1,16 @@
+{
+    "name": "Castor OBS SDK",
+    "sdkVersion": "32.1.2-castor.1",
+    "obsVersion": "32.1.2",
+    "castorRevision": 1,
+    "runtimeIdentifier": "win-x64",
+    "architecture": "x64",
+    "configuration": "RelWithDebInfo",
+    "contents": {
+        "headers": "include",
+        "importLibraries": "lib",
+        "runtime": "runtime",
+        "cmake": "cmake",
+        "licenses": "licenses"
+    }
+}

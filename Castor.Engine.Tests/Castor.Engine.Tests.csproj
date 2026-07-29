@@ -19,7 +19,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
-	
+
 	<ItemGroup>
 	  <ProjectReference Include="..\Castor.Engine\Castor.Engine.csproj" />
 	</ItemGroup>
@@ -35,6 +35,12 @@
 		  Include="$(CastorHostPath)"
 		  Condition="Exists('$(CastorHostPath)')">
 			<Link>Castor.Engine.Host.dll</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None
+		  Include="$(CastorRuntimeRoot)\bin\*"
+		  Condition="Exists('$(CastorRuntimeRoot)\bin')">
+			<Link>%(Filename)%(Extension)</Link>
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>

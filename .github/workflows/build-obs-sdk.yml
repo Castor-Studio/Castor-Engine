@@ -1,0 +1,507 @@
+name: Build OBS SDK
+
+on:
+  workflow_dispatch:
+    inputs:
+      obs_version:
+        description: OBS Studio version
+        required: true
+        type: string
+
+      castor_revision:
+        description: Castor SDK revision
+        required: true
+        default: "1"
+        type: string
+
+      publish_release:
+        description: Publish the GitHub Release after validation
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: >-
+    obs-sdk-${{ inputs.obs_version }}-castor-${{ inputs.castor_revision }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-validate-windows-x64:
+    name: Build and validate Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 150
+
+    outputs:
+      archive-name: ${{ steps.metadata.outputs.archive-name }}
+      artifact-name: ${{ steps.metadata.outputs.artifact-name }}
+      release-tag: ${{ steps.metadata.outputs.release-tag }}
+      sdk-version: ${{ steps.metadata.outputs.sdk-version }}
+      sha256: ${{ steps.package.outputs.sha256 }}
+
+    steps:
+      - name: Checkout Castor Engine
+        uses: actions/checkout@v7
+
+      - name: Validate inputs and prepare SDK metadata
+        id: metadata
+        shell: pwsh
+        env:
+          INPUT_OBS_VERSION: ${{ inputs.obs_version }}
+          INPUT_CASTOR_REVISION: ${{ inputs.castor_revision }}
+          INPUT_PUBLISH_RELEASE: ${{ inputs.publish_release }}
+        run: |
+          $obsVersion = $env:INPUT_OBS_VERSION.Trim()
+          $sdkRevision = $env:INPUT_CASTOR_REVISION.Trim()
+
+          if ($obsVersion -notmatch '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
+            throw "Invalid OBS Studio version: $obsVersion"
+          }
+
+          if ($sdkRevision -notmatch '^[1-9]\d*$') {
+            throw "Castor SDK revision must be a positive integer."
+          }
+
+          $sdkVersion = "$obsVersion-castor.$sdkRevision"
+          $releaseTag = $sdkVersion
+          $archiveName = "Castor.Obs.Sdk.win-x64-$sdkVersion.zip"
+          $artifactName = "castor-obs-sdk-$sdkVersion-win-x64"
+
+          if ($env:INPUT_PUBLISH_RELEASE -eq "true") {
+            $existingTag = git ls-remote `
+              --tags `
+              origin `
+              "refs/tags/$releaseTag"
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to inspect existing Git tags."
+            }
+
+            if (![string]::IsNullOrWhiteSpace($existingTag)) {
+              throw "The Git tag already exists: $releaseTag"
+            }
+          }
+
+          $versionFile = `
+            "cmake/dependencies/CastorObsSdkVersion.cmake"
+
+          $contents = Get-Content `
+            -LiteralPath $versionFile `
+            -Raw
+
+          $obsPattern = `
+            'set\s*\(\s*CASTOR_OBS_VERSION\s*"[^"]+"\s*\)'
+
+          $revisionPattern = `
+            'set\s*\(\s*CASTOR_OBS_SDK_REVISION\s*"[^"]+"\s*\)'
+
+          if (![regex]::IsMatch($contents, $obsPattern)) {
+            throw "CASTOR_OBS_VERSION was not found."
+          }
+
+          if (![regex]::IsMatch($contents, $revisionPattern)) {
+            throw "CASTOR_OBS_SDK_REVISION was not found."
+          }
+
+          $contents = [regex]::Replace(
+            $contents,
+            $obsPattern,
+            "set(CASTOR_OBS_VERSION `"$obsVersion`")"
+          )
+
+          $contents = [regex]::Replace(
+            $contents,
+            $revisionPattern,
+            "set(CASTOR_OBS_SDK_REVISION `"$sdkRevision`")"
+          )
+
+          [System.IO.File]::WriteAllText(
+            (Resolve-Path -LiteralPath $versionFile),
+            $contents,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+          "obs-version=$obsVersion" >> $env:GITHUB_OUTPUT
+          "sdk-revision=$sdkRevision" >> $env:GITHUB_OUTPUT
+          "sdk-version=$sdkVersion" >> $env:GITHUB_OUTPUT
+          "release-tag=$releaseTag" >> $env:GITHUB_OUTPUT
+          "archive-name=$archiveName" >> $env:GITHUB_OUTPUT
+          "artifact-name=$artifactName" >> $env:GITHUB_OUTPUT
+
+      - name: Checkout OBS Studio
+        uses: actions/checkout@v7
+        with:
+          repository: obsproject/obs-studio
+          ref: ${{ steps.metadata.outputs.obs-version }}
+          path: _obs
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Build and install OBS Studio
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\_obs\.github\scripts\Build-Windows.ps1" `
+            -Target x64 `
+            -Configuration RelWithDebInfo
+
+      - name: Install OBS development files
+        shell: pwsh
+        run: |
+          $buildRoot = "$env:GITHUB_WORKSPACE\_obs\build_x64"
+          $installRoot = "$buildRoot\install"
+
+          cmake --install $buildRoot `
+            --config RelWithDebInfo `
+            --component Development `
+            --prefix $installRoot
+
+      - name: Validate OBS installation
+        shell: pwsh
+        run: |
+          $installRoot = `
+            "$env:GITHUB_WORKSPACE\_obs\build_x64\install"
+
+          $requiredFiles = @(
+            "$installRoot\bin\64bit\obs.dll",
+            "$installRoot\include\obs.h",
+            "$installRoot\include\obsconfig.h",
+            "$installRoot\lib\obs.lib",
+            "$installRoot\cmake\libobsConfig.cmake",
+            "$installRoot\cmake\libobsTargets.cmake"
+          )
+
+          foreach ($file in $requiredFiles) {
+            if (!(Test-Path -LiteralPath $file -PathType Leaf)) {
+              throw "Required OBS SDK file was not generated: $file"
+            }
+
+            Write-Host "Found: $file"
+          }
+
+      - name: Package Castor OBS SDK
+        id: package
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\.github\scripts\Package-ObsSdk.ps1" `
+            -ObsInstallRoot "$env:GITHUB_WORKSPACE\_obs\build_x64\install" `
+            -ObsSourceRoot "$env:GITHUB_WORKSPACE\_obs" `
+            -OutputDirectory "$env:GITHUB_WORKSPACE\artifacts\obs-sdk" `
+            -Configuration "RelWithDebInfo"
+
+      - name: Validate SDK archive and configure bootstrap checksum
+        id: sdk
+        shell: pwsh
+        env:
+          EXPECTED_ARCHIVE_NAME: ${{ steps.metadata.outputs.archive-name }}
+          PACKAGE_ARCHIVE_PATH: ${{ steps.package.outputs.archive-path }}
+          PACKAGE_CHECKSUM_PATH: ${{ steps.package.outputs.checksum-path }}
+          PACKAGE_SHA256: ${{ steps.package.outputs.sha256 }}
+        run: |
+          $archivePath = $env:PACKAGE_ARCHIVE_PATH
+          $checksumPath = $env:PACKAGE_CHECKSUM_PATH
+
+          if (!(Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+            throw "SDK archive was not generated: $archivePath"
+          }
+
+          if (!(Test-Path -LiteralPath $checksumPath -PathType Leaf)) {
+            throw "SDK checksum was not generated: $checksumPath"
+          }
+
+          if (
+            [System.IO.Path]::GetFileName($archivePath) -ne
+            $env:EXPECTED_ARCHIVE_NAME
+          ) {
+            throw "Unexpected SDK archive name: $archivePath"
+          }
+
+          $publishedHash = (
+            Get-Content -LiteralPath $checksumPath -Raw
+          ).Split(
+            [char[]] " `t`r`n",
+            [System.StringSplitOptions]::RemoveEmptyEntries
+          )[0].ToLowerInvariant()
+
+          $actualHash = (
+            Get-FileHash `
+              -LiteralPath $archivePath `
+              -Algorithm SHA256
+          ).Hash.ToLowerInvariant()
+
+          if ($publishedHash -ne $actualHash) {
+            throw "The checksum file does not match the SDK archive."
+          }
+
+          if ($env:PACKAGE_SHA256 -ne $actualHash) {
+            throw "The packaging output does not match the SDK archive."
+          }
+
+          $versionFile = `
+            "cmake/dependencies/CastorObsSdkVersion.cmake"
+
+          $contents = Get-Content `
+            -LiteralPath $versionFile `
+            -Raw
+
+          $shaPattern = (
+            '(?s)set\s*\(\s*CASTOR_OBS_SDK_SHA256' +
+            '\s*"[^"]+"\s*\)'
+          )
+
+          if (![regex]::IsMatch($contents, $shaPattern)) {
+            throw "CASTOR_OBS_SDK_SHA256 was not found."
+          }
+
+          $replacement = @"
+          set(
+              CASTOR_OBS_SDK_SHA256
+              "$actualHash"
+          )
+          "@
+
+          $contents = [regex]::Replace(
+            $contents,
+            $shaPattern,
+            $replacement.Trim()
+          )
+
+          [System.IO.File]::WriteAllText(
+            (Resolve-Path -LiteralPath $versionFile),
+            $contents,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+          Write-Host "Validated SDK SHA-256: $actualHash"
+          "archive-path=$archivePath" >> $env:GITHUB_OUTPUT
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Configure Castor Engine with generated SDK
+        shell: pwsh
+        run: |
+          cmake --preset windows-x64 `
+            "-DCASTOR_OBS_SDK_ARCHIVE_PATH=${{ steps.sdk.outputs.archive-path }}"
+
+      - name: Build Castor Engine
+        run: cmake --build --preset windows-x64-release
+
+      - name: Install Castor Engine runtime
+        run: >
+          cmake --install build/windows-x64
+          --config Release
+          --prefix artifacts/runtime/win-x64
+
+      - name: Verify libobs linkage
+        shell: pwsh
+        run: |
+          $hostDll = `
+            "artifacts/runtime/win-x64/bin/Castor.Engine.Host.dll"
+
+          if (!(Test-Path -LiteralPath $hostDll -PathType Leaf)) {
+            throw "Castor.Engine.Host.dll was not installed."
+          }
+
+          $vswhere = Join-Path `
+            ${env:ProgramFiles(x86)} `
+            "Microsoft Visual Studio/Installer/vswhere.exe"
+
+          $visualStudioRoot = & $vswhere `
+            -latest `
+            -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+
+          if ([string]::IsNullOrWhiteSpace($visualStudioRoot)) {
+            throw "Visual Studio C++ tools were not found."
+          }
+
+          $msvcRoot = Get-ChildItem `
+            -LiteralPath "$visualStudioRoot/VC/Tools/MSVC" `
+            -Directory |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+
+          $dumpbin = Join-Path `
+            $msvcRoot.FullName `
+            "bin/Hostx64/x64/dumpbin.exe"
+
+          if (!(Test-Path -LiteralPath $dumpbin -PathType Leaf)) {
+            throw "dumpbin.exe was not found: $dumpbin"
+          }
+
+          $dependencies = `
+            & $dumpbin /dependents $hostDll |
+            Out-String
+
+          Write-Host $dependencies
+
+          if ($dependencies -notmatch '(?im)^\s*obs\.dll\s*$') {
+            throw "Castor.Engine.Host.dll is not linked to obs.dll."
+          }
+
+      - name: Restore managed projects
+        run: dotnet restore Castor.Engine.Tests/Castor.Engine.Tests.csproj
+
+      - name: Build managed projects
+        run: >
+          dotnet build Castor.Engine.Tests/Castor.Engine.Tests.csproj
+          --configuration Release
+          --no-restore
+
+      - name: Run integration tests
+        run: >
+          dotnet test Castor.Engine.Tests/Castor.Engine.Tests.csproj
+          --configuration Release
+          --no-build
+
+      - name: Upload validated Castor OBS SDK
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.metadata.outputs.artifact-name }}
+          path: |
+            ${{ steps.package.outputs.archive-path }}
+            ${{ steps.package.outputs.checksum-path }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-and-validate-windows-x64
+    if: ${{ inputs.publish_release == true }}
+    runs-on: windows-2022
+    timeout-minutes: 15
+    environment: obs-sdk-release
+
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download validated Castor OBS SDK
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ needs.build-and-validate-windows-x64.outputs.artifact-name }}
+          path: artifacts/obs-sdk
+
+      - name: Validate release assets
+        id: assets
+        shell: pwsh
+        env:
+          ARCHIVE_NAME: >-
+            ${{ needs.build-and-validate-windows-x64.outputs.archive-name }}
+          EXPECTED_SHA256: >-
+            ${{ needs.build-and-validate-windows-x64.outputs.sha256 }}
+        run: |
+          $archivePath = Join-Path `
+            "artifacts/obs-sdk" `
+            $env:ARCHIVE_NAME
+
+          $checksumPath = "$archivePath.sha256"
+
+          if (!(Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+            throw "Release archive was not downloaded: $archivePath"
+          }
+
+          if (!(Test-Path -LiteralPath $checksumPath -PathType Leaf)) {
+            throw "Release checksum was not downloaded: $checksumPath"
+          }
+
+          $actualHash = (
+            Get-FileHash `
+              -LiteralPath $archivePath `
+              -Algorithm SHA256
+          ).Hash.ToLowerInvariant()
+
+          $publishedHash = (
+            Get-Content -LiteralPath $checksumPath -Raw
+          ).Split(
+            [char[]] " `t`r`n",
+            [System.StringSplitOptions]::RemoveEmptyEntries
+          )[0].ToLowerInvariant()
+
+          if ($actualHash -ne $env:EXPECTED_SHA256) {
+            throw "Downloaded release archive SHA-256 mismatch."
+          }
+
+          if ($publishedHash -ne $actualHash) {
+            throw "Downloaded checksum file does not match the archive."
+          }
+
+          "archive-path=$archivePath" >> $env:GITHUB_OUTPUT
+          "checksum-path=$checksumPath" >> $env:GITHUB_OUTPUT
+
+      - name: Create release notes
+        shell: pwsh
+        env:
+          RELEASE_TAG: >-
+            ${{ needs.build-and-validate-windows-x64.outputs.release-tag }}
+          OBS_VERSION: ${{ inputs.obs_version }}
+          SHA256: ${{ needs.build-and-validate-windows-x64.outputs.sha256 }}
+        run: |
+          $notes = @"
+          ## Castor OBS SDK $env:RELEASE_TAG
+
+          Windows x64 SDK built from OBS Studio $env:OBS_VERSION for Castor Engine.
+
+          ### Included
+
+          - libobs headers and import libraries
+          - OBS runtime and required dependencies
+          - Selected OBS plugins and their data files
+          - CMake package exposing OBS::libobs
+          - Third-party licenses
+
+          ### Excluded
+
+          - OBS frontend application
+          - Qt and CEF
+          - Debugging symbols
+          - OBS scripting runtime
+
+          ### Integrity
+
+          SHA-256:
+
+          $env:SHA256
+
+          ### Validation
+
+          - Archive integrity and manifest validated
+          - CMake bootstrap validated
+          - Castor.Engine.Host.dll compiled with MSVC and linked to obs.dll
+          - .NET integration tests passed
+
+          ### Runtime requirement
+
+          Microsoft Visual C++ Redistributable 2015-2022 x64.
+          "@
+
+          [System.IO.File]::WriteAllText(
+            (Join-Path $PWD "release-notes.md"),
+            $notes,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: >-
+            ${{ needs.build-and-validate-windows-x64.outputs.release-tag }}
+          TARGET_SHA: ${{ github.sha }}
+          ARCHIVE_PATH: ${{ steps.assets.outputs.archive-path }}
+          CHECKSUM_PATH: ${{ steps.assets.outputs.checksum-path }}
+        run: |
+          gh release create $env:RELEASE_TAG `
+            $env:ARCHIVE_PATH `
+            $env:CHECKSUM_PATH `
+            --target $env:TARGET_SHA `
+            --title "Castor OBS SDK $env:RELEASE_TAG" `
+            --notes-file "release-notes.md"
