@@ -26,6 +26,12 @@ extern "C"
 
     CASTOR_ENGINE_API const char* castor_engine_get_version(void);
 
+    CASTOR_ENGINE_API uint8_t castor_engine_initialize(void);
+
+    CASTOR_ENGINE_API void castor_engine_shutdown(void);
+
+    CASTOR_ENGINE_API uint8_t castor_engine_is_initialized(void);
+
 #ifdef __cplusplus
 }
 #endif
