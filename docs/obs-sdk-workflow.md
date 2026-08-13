@@ -425,6 +425,9 @@ The SDK contains only what Castor Engine needs:
 - the OBS runtime and required dependencies;
 - selected capture, audio, encoding, output, source, filter, transition, and
   service plugins;
+- the capability probe executables a selected hardware encoder plugin needs
+  at runtime (for example `obs-nvenc-test.exe` for `obs-nvenc` and
+  `obs-qsv-test.exe` for `obs-qsv11`), packaged alongside `obs.dll`;
 - plugin and libobs data files;
 - OBS and available third-party license notices;
 - `manifest.json`.
