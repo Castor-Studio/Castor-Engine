@@ -70,6 +70,9 @@
 		<Error
 		  Condition="!Exists('$(CastorRuntimeRoot)\data\obs-plugins')"
 		  Text="The packaged OBS plugin data directory was not found at: $(CastorRuntimeRoot)\data\obs-plugins." />
+		<Error
+		  Condition="!Exists('$(CastorRuntimeRoot)\data\libobs')"
+		  Text="The packaged libobs data directory was not found at: $(CastorRuntimeRoot)\data\libobs." />
 	</Target>
 
 </Project>
