@@ -62,10 +62,7 @@ audio_lifecycle_result audio_subsystem::configure(const castor_engine_audio_conf
 
     const castor_engine_audio_config_t effective_config = resolve_effective_config(*config);
 
-    obs_audio_info active_audio_info{};
-    const bool obs_reports_active = obs_get_audio_info(&active_audio_info);
-
-    if (configured_ && obs_reports_active)
+    if (configured_)
     {
         if (audio_configs_match(current_config_, effective_config))
         {
@@ -77,11 +74,6 @@ audio_lifecycle_result audio_subsystem::configure(const castor_engine_audio_conf
                            " Hz with speaker layout " + std::to_string(current_config_.speaker_layout) +
                            ". OBS does not support runtime audio reconfiguration; shut down the engine before "
                            "applying a different audio configuration.");
-    }
-
-    if (configured_ && !obs_reports_active)
-    {
-        reset();
     }
 
     obs_audio_info audio_info{};
@@ -98,16 +90,16 @@ audio_lifecycle_result audio_subsystem::configure(const castor_engine_audio_conf
     return {CASTOR_ENGINE_OK, {}};
 }
 
+// Unlike the video subsystem, audio does not re-verify its state against
+// OBS on every query. Castor is the sole owner of the OBS audio lifecycle
+// (obs_reset_audio/obs_shutdown are only ever called from this file and
+// castor_engine_shutdown), so configured_ cannot drift from OBS's actual
+// state without our own knowledge. Querying OBS here was also observed to
+// race with obs_reset_audio's internal audio thread startup when called in
+// quick succession, causing an access violation inside obs.dll.
 bool audio_subsystem::is_configured()
 {
-    if (!obs_initialized() || !configured_)
-    {
-        return false;
-    }
-
-    obs_audio_info audio_info{};
-    configured_ = obs_get_audio_info(&audio_info);
-    return configured_;
+    return obs_initialized() && configured_;
 }
 
 bool audio_subsystem::get_effective_config(castor_engine_audio_config_t* out_config)
