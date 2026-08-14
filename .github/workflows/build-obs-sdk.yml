@@ -31,7 +31,7 @@ concurrency:
 jobs:
   build-and-validate-windows-x64:
     name: Build and validate Windows x64
-    runs-on: windows-2025-vs2026
+    runs-on: windows-2022
     timeout-minutes: 150
 
     outputs:
@@ -279,16 +279,16 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x
 
       - name: Configure Castor Engine with generated SDK
         shell: pwsh
         run: |
-          cmake --preset windows-x64 `
+          cmake --preset windows-ci-x64 `
             "-DCASTOR_OBS_SDK_ARCHIVE_PATH=${{ steps.sdk.outputs.archive-path }}"
 
       - name: Build Castor Engine
-        run: cmake --build --preset windows-x64
+        run: cmake --build --preset windows-ci-x64
 
       - name: Install Castor Engine runtime
         run: >
