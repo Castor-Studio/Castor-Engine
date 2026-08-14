@@ -137,6 +137,24 @@ namespace Castor.Engine.Tests
         }
 
         [StaFact]
+        public void ConfigureVideoShouldWorkAfterRuntimeRestart()
+        {
+            var runtimeConfiguration = CreateRuntimeConfiguration();
+            var videoConfiguration = CreateVideoConfiguration();
+
+            EngineRuntime.Initialize(runtimeConfiguration);
+            EngineRuntime.ConfigureVideo(videoConfiguration);
+            EngineRuntime.Shutdown();
+
+            Assert.False(EngineRuntime.IsVideoConfigured);
+
+            EngineRuntime.Initialize(runtimeConfiguration);
+            EngineRuntime.ConfigureVideo(videoConfiguration);
+
+            Assert.True(EngineRuntime.IsVideoConfigured);
+        }
+
+        [StaFact]
         public void ShutdownShouldBeIdempotent()
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
