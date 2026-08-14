@@ -337,6 +337,22 @@ $plugins = @(
     "rtmp-services"
 )
 
+# Some hardware encoder plugins launch a short-lived companion process to
+# probe encoder support in isolation, so a driver crash during detection
+# cannot take down the host process. Each packaged plugin below must ship
+# its required probe executable alongside it under bin\64bit, matching the
+# layout upstream OBS itself uses.
+#
+# AMF (enc-amf) is intentionally not part of $plugins above, so it has no
+# entry here. Upstream OBS's AMF encoder queries the AMF runtime in-process
+# instead of spawning a companion probe executable. If enc-amf is ever added
+# to the selected plugin set, re-verify that against the adopted OBS version
+# before assuming no probe binary needs to be packaged.
+$hardwareEncoderProbeExecutables = [ordered]@{
+    "obs-nvenc" = @("obs-nvenc-test.exe")
+    "obs-qsv11" = @("obs-qsv-test.exe")
+}
+
 foreach ($plugin in $plugins) {
     $pluginBinary = Join-Path `
         $ObsInstallRoot `
@@ -348,6 +364,19 @@ foreach ($plugin in $plugins) {
         -LiteralPath $pluginBinary `
         -Destination $runtimePluginRoot `
         -Force
+
+    if ($hardwareEncoderProbeExecutables.Contains($plugin)) {
+        foreach ($probeExecutable in $hardwareEncoderProbeExecutables[$plugin]) {
+            $probeSource = Join-Path $sourceBinRoot $probeExecutable
+
+            Assert-File $probeSource
+
+            Copy-Item `
+                -LiteralPath $probeSource `
+                -Destination $runtimeBinRoot `
+                -Force
+        }
+    }
 
     $pluginData = Join-Path `
         $ObsInstallRoot `
@@ -488,6 +517,29 @@ $requiredPackageFiles = @(
 
 foreach ($requiredFile in $requiredPackageFiles) {
     Assert-File $requiredFile
+}
+
+# A selected hardware encoder plugin must never ship without the probe
+# executable it needs to detect encoder support. Missing it here would
+# surface later as "CreateProcessW failed" at runtime, on whatever machine
+# happens to have the corresponding hardware, instead of failing the build.
+foreach ($plugin in $hardwareEncoderProbeExecutables.Keys) {
+    if ($plugins -notcontains $plugin) {
+        continue
+    }
+
+    foreach ($probeExecutable in $hardwareEncoderProbeExecutables[$plugin]) {
+        $stagedProbePath = Join-Path $runtimeBinRoot $probeExecutable
+
+        if (!(Test-Path -LiteralPath $stagedProbePath -PathType Leaf)) {
+            throw (
+                "Hardware encoder plugin '$plugin' is selected for " +
+                "packaging but its required probe executable " +
+                "'$probeExecutable' was not staged under " +
+                "'$runtimeBinRoot'."
+            )
+        }
+    }
 }
 
 $forbiddenFiles = Get-ChildItem `
