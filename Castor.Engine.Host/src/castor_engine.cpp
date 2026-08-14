@@ -1,5 +1,7 @@
 #include "castor_engine.h"
 
+#include "video_configuration.h"
+
 #include <filesystem>
 #include <mutex>
 #include <obs.h>
@@ -11,7 +13,10 @@ namespace
 {
 std::mutex lifecycle_mutex;
 bool modules_loaded = false;
+std::string registered_libobs_data_path;
 thread_local std::string last_error;
+
+castor::engine::detail::video_subsystem video;
 
 std::string path_to_utf8(const std::filesystem::path& path)
 {
@@ -23,6 +28,44 @@ std::string path_to_utf8(const std::filesystem::path& path)
 void set_last_error(std::string message)
 {
     last_error = std::move(message);
+}
+
+void unregister_libobs_data_path()
+{
+    if (registered_libobs_data_path.empty())
+    {
+        return;
+    }
+
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+    obs_remove_data_path(registered_libobs_data_path.c_str());
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+    registered_libobs_data_path.clear();
+}
+
+void register_libobs_data_path(std::string path)
+{
+    if (registered_libobs_data_path == path)
+    {
+        return;
+    }
+
+    unregister_libobs_data_path();
+
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+    obs_add_data_path(path.c_str());
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+    registered_libobs_data_path = std::move(path);
 }
 
 void count_loaded_module(void* parameter, obs_module_t*)
@@ -71,12 +114,15 @@ std::string describe_module_failures(const obs_module_failure_info& failure_info
 void rollback_startup(bool started_here)
 {
     modules_loaded = false;
+    video.reset();
+    unregister_libobs_data_path();
 
     if (started_here && obs_initialized())
     {
         obs_shutdown();
     }
 }
+
 } // namespace
 
 uint32_t castor_engine_get_abi_version(void)
@@ -125,6 +171,7 @@ castor_engine_result_t castor_engine_initialize(const castor_engine_config_t* co
         const auto runtime_root = std::filesystem::u8path(config->runtime_root);
         const auto plugin_binary_directory = runtime_root / "obs-plugins" / "64bit";
         const auto plugin_data_directory = runtime_root / "data" / "obs-plugins";
+        const auto libobs_data_directory = runtime_root / "data" / "libobs";
 
         std::error_code filesystem_error;
 
@@ -151,6 +198,14 @@ castor_engine_result_t castor_engine_initialize(const castor_engine_config_t* co
             return CASTOR_ENGINE_INVALID_RUNTIME;
         }
 
+        filesystem_error.clear();
+
+        if (!std::filesystem::is_directory(libobs_data_directory, filesystem_error))
+        {
+            set_last_error("The libobs data directory is missing: " + path_to_utf8(libobs_data_directory) + ".");
+            return CASTOR_ENGINE_INVALID_RUNTIME;
+        }
+
         if (modules_loaded && obs_initialized())
         {
             return CASTOR_ENGINE_OK;
@@ -169,6 +224,9 @@ castor_engine_result_t castor_engine_initialize(const castor_engine_config_t* co
 
         const std::string plugin_binary_path = path_to_utf8(plugin_binary_directory);
         const std::string plugin_data_path = path_to_utf8(plugin_data_directory / "%module%");
+        const std::string libobs_data_path = path_to_utf8(libobs_data_directory) + "/";
+
+        register_libobs_data_path(libobs_data_path);
 
         obs_add_module_path(plugin_binary_path.c_str(), plugin_data_path.c_str());
 
@@ -251,6 +309,28 @@ uint8_t castor_engine_is_module_loaded(const char* module_name)
     return obs_get_module(module_name) != nullptr ? 1U : 0U;
 }
 
+castor_engine_result_t castor_engine_configure_video(const castor_engine_video_config_t* config)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    castor::engine::detail::video_configuration_result result =
+        video.configure(config, obs_initialized() && modules_loaded);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+uint8_t castor_engine_is_video_configured(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return video.is_configured() ? 1U : 0U;
+}
+
 void castor_engine_shutdown(void)
 {
     std::scoped_lock lock(lifecycle_mutex);
@@ -261,6 +341,8 @@ void castor_engine_shutdown(void)
     }
 
     modules_loaded = false;
+    video.reset();
+    unregister_libobs_data_path();
     last_error.clear();
 }
 

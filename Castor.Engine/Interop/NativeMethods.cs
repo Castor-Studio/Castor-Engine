@@ -10,6 +10,12 @@ namespace Castor.Engine.Interop
         InvalidRuntime = 2,
         ObsStartupFailed = 3,
         ModuleLoadFailed = 4,
+        NotInitialized = 5,
+        VideoNotSupported = 6,
+        VideoInvalidConfiguration = 7,
+        VideoCurrentlyActive = 8,
+        VideoModuleNotFound = 9,
+        VideoConfigurationFailed = 10,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -18,6 +24,18 @@ namespace Castor.Engine.Interop
         internal uint StructSize;
         internal nint RuntimeRoot;
         internal nint Locale;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineVideoConfiguration
+    {
+        internal uint StructSize;
+        internal uint BaseWidth;
+        internal uint BaseHeight;
+        internal uint OutputWidth;
+        internal uint OutputHeight;
+        internal uint FramesPerSecondNumerator;
+        internal uint FramesPerSecondDenominator;
     }
 
     internal static partial class NativeMethods
@@ -67,6 +85,19 @@ namespace Castor.Engine.Interop
             StringMarshalling = StringMarshalling.Utf8)]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial byte IsModuleLoaded(string moduleName);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_configure_video")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult ConfigureVideo(
+            in NativeEngineVideoConfiguration configuration);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_is_video_configured")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte IsVideoConfigured();
 
         [LibraryImport(
             LibraryName,
