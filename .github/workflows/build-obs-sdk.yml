@@ -31,7 +31,7 @@ concurrency:
 jobs:
   build-and-validate-windows-x64:
     name: Build and validate Windows x64
-    runs-on: windows-2022
+    runs-on: windows-2025-vs2026
     timeout-minutes: 150
 
     outputs:
@@ -288,12 +288,12 @@ jobs:
             "-DCASTOR_OBS_SDK_ARCHIVE_PATH=${{ steps.sdk.outputs.archive-path }}"
 
       - name: Build Castor Engine
-        run: cmake --build --preset windows-x64-release
+        run: cmake --build --preset windows-x64
 
       - name: Install Castor Engine runtime
         run: >
-          cmake --install build/windows-x64
-          --config Release
+          cmake --install build_x64
+          --config RelWithDebInfo
           --prefix artifacts/runtime/win-x64
 
       - name: Verify libobs linkage
