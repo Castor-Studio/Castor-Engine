@@ -21,6 +21,12 @@ namespace Castor.Engine
             NativeMethods.GetLoadedModuleCount();
 
         /// <summary>
+        /// Gets whether the OBS video subsystem is configured.
+        /// </summary>
+        public static bool IsVideoConfigured =>
+            NativeMethods.IsVideoConfigured() != 0;
+
+        /// <summary>
         /// Initializes the OBS runtime and loads the packaged OBS modules.
         /// </summary>
         /// <param name="configuration">
@@ -65,7 +71,9 @@ namespace Castor.Engine
 
                 if (result != NativeEngineResult.Ok)
                 {
-                    throw CreateInitializationException(result);
+                    throw CreateNativeOperationException(
+                        "initialize the OBS runtime",
+                        result);
                 }
             }
             finally
@@ -90,6 +98,52 @@ namespace Castor.Engine
         }
 
         /// <summary>
+        /// Configures the OBS video subsystem for rendering and encoding.
+        /// </summary>
+        /// <param name="configuration">
+        /// The base resolution, output resolution, and frame rate.
+        /// </param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown when <paramref name="configuration"/> is null.
+        /// </exception>
+        /// <exception cref="NotSupportedException">
+        /// Thrown when the native and managed ABI versions are incompatible.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the engine is not initialized or OBS cannot configure
+        /// video with the requested settings.
+        /// </exception>
+        public static void ConfigureVideo(
+            EngineVideoConfiguration configuration)
+        {
+            ArgumentNullException.ThrowIfNull(configuration);
+            EngineInfo.ValidateCompatibility();
+
+            var nativeConfiguration = new NativeEngineVideoConfiguration
+            {
+                StructSize = checked(
+                    (uint)Marshal.SizeOf<NativeEngineVideoConfiguration>()),
+                BaseWidth = configuration.BaseWidth,
+                BaseHeight = configuration.BaseHeight,
+                OutputWidth = configuration.OutputWidth,
+                OutputHeight = configuration.OutputHeight,
+                FramesPerSecondNumerator =
+                    configuration.FramesPerSecondNumerator,
+                FramesPerSecondDenominator =
+                    configuration.FramesPerSecondDenominator,
+            };
+
+            var result = NativeMethods.ConfigureVideo(in nativeConfiguration);
+
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException(
+                    "configure OBS video",
+                    result);
+            }
+        }
+
+        /// <summary>
         /// Shuts down the OBS runtime.
         /// </summary>
         public static void Shutdown()
@@ -97,7 +151,8 @@ namespace Castor.Engine
             NativeMethods.Shutdown();
         }
 
-        private static InvalidOperationException CreateInitializationException(
+        private static InvalidOperationException CreateNativeOperationException(
+            string operation,
             NativeEngineResult result)
         {
             var errorPointer = NativeMethods.GetLastError();
@@ -110,7 +165,7 @@ namespace Castor.Engine
                 : nativeMessage;
 
             return new InvalidOperationException(
-                $"Failed to initialize the OBS runtime ({result}): {detail}");
+                $"Failed to {operation} ({result}): {detail}");
         }
     }
 }
