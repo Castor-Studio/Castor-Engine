@@ -63,20 +63,167 @@ namespace Castor.Engine.Tests
         }
 
         [StaFact]
+        public void ConfigureVideoShouldConfigurePackagedD3D11Runtime()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+
+            EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
+
+            Assert.True(EngineRuntime.IsVideoConfigured);
+        }
+
+        [StaFact]
+        public void ConfigureVideoShouldBeIdempotentForSameSettings()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            var configuration = CreateVideoConfiguration();
+
+            EngineRuntime.ConfigureVideo(configuration);
+            EngineRuntime.ConfigureVideo(configuration);
+
+            Assert.True(EngineRuntime.IsVideoConfigured);
+        }
+
+        [StaFact]
+        public void ConfigureVideoShouldAcceptObsAlignedOutputWidth()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            var configuration = new EngineVideoConfiguration(
+                1280,
+                720,
+                854,
+                480,
+                30,
+                1);
+
+            EngineRuntime.ConfigureVideo(configuration);
+
+            Assert.True(EngineRuntime.IsVideoConfigured);
+        }
+
+        [StaFact]
+        public void ConfigureVideoShouldTreatEquivalentOutputWidthsAsIdempotent()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            var unalignedConfiguration = new EngineVideoConfiguration(
+                1280,
+                720,
+                854,
+                480,
+                30,
+                1);
+            var alignedConfiguration = new EngineVideoConfiguration(
+                1280,
+                720,
+                852,
+                480,
+                30,
+                1);
+
+            EngineRuntime.ConfigureVideo(unalignedConfiguration);
+            EngineRuntime.ConfigureVideo(alignedConfiguration);
+
+            Assert.True(EngineRuntime.IsVideoConfigured);
+        }
+
+        [StaFact]
+        public void ConfigureVideoShouldRejectOddDimensions()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            var configuration = new EngineVideoConfiguration(
+                1280,
+                720,
+                1279,
+                720,
+                30,
+                1);
+
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => EngineRuntime.ConfigureVideo(configuration));
+
+            Assert.Contains("InvalidArgument", exception.Message);
+            Assert.Contains("output video width must be even", exception.Message);
+            Assert.False(EngineRuntime.IsVideoConfigured);
+        }
+
+        [StaFact]
+        public void ConfigureVideoShouldRejectZeroFps()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            var configuration = new EngineVideoConfiguration(
+                1280,
+                720,
+                1280,
+                720,
+                0,
+                1);
+
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => EngineRuntime.ConfigureVideo(configuration));
+
+            Assert.Contains("InvalidArgument", exception.Message);
+            Assert.Contains("must both be non-zero", exception.Message);
+            Assert.False(EngineRuntime.IsVideoConfigured);
+        }
+
+        [Fact]
+        public void ConfigureVideoShouldRequireInitialization()
+        {
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => EngineRuntime.ConfigureVideo(
+                    CreateVideoConfiguration()));
+
+            Assert.Contains("NotInitialized", exception.Message);
+            Assert.Contains("must be initialized", exception.Message);
+            Assert.False(EngineRuntime.IsVideoConfigured);
+        }
+
+        [StaFact]
+        public void ConfigureVideoShouldWorkAfterRuntimeRestart()
+        {
+            var runtimeConfiguration = CreateRuntimeConfiguration();
+            var videoConfiguration = CreateVideoConfiguration();
+
+            EngineRuntime.Initialize(runtimeConfiguration);
+            EngineRuntime.ConfigureVideo(videoConfiguration);
+            EngineRuntime.Shutdown();
+
+            Assert.False(EngineRuntime.IsVideoConfigured);
+
+            EngineRuntime.Initialize(runtimeConfiguration);
+            EngineRuntime.ConfigureVideo(videoConfiguration);
+
+            Assert.True(EngineRuntime.IsVideoConfigured);
+        }
+
+        [StaFact]
         public void ShutdownShouldBeIdempotent()
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
 
             EngineRuntime.Shutdown();
             EngineRuntime.Shutdown();
 
             Assert.False(EngineRuntime.IsInitialized);
             Assert.Equal(0U, EngineRuntime.LoadedModuleCount);
+            Assert.False(EngineRuntime.IsVideoConfigured);
         }
 
         private static EngineRuntimeConfiguration CreateRuntimeConfiguration()
         {
             return new EngineRuntimeConfiguration(AppContext.BaseDirectory);
+        }
+
+        private static EngineVideoConfiguration CreateVideoConfiguration()
+        {
+            return new EngineVideoConfiguration(
+                1280,
+                720,
+                1280,
+                720,
+                30,
+                1);
         }
     }
 }
