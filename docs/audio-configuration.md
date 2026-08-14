@@ -1,4 +1,33 @@
-# Native Audio Configuration
+# Audio Configuration
+
+The managed API accepts Castor-owned values and does not expose native or
+OBS types:
+
+```csharp
+EngineRuntime.Initialize(
+    new EngineRuntimeConfiguration(AppContext.BaseDirectory));
+
+EngineRuntime.ConfigureAudio(
+    new EngineAudioConfiguration(
+        sampleRate: 48000,
+        speakerLayout: EngineSpeakerLayout.Stereo));
+
+bool isConfigured = EngineRuntime.IsAudioConfigured;
+
+EngineAudioConfiguration effective = EngineRuntime.GetAudioConfiguration();
+```
+
+`EngineRuntime.ConfigureAudio`, `EngineRuntime.IsAudioConfigured`, and
+`EngineRuntime.GetAudioConfiguration` mirror `castor_engine_configure_audio`,
+`castor_engine_is_audio_configured`, and `castor_engine_get_audio_config`
+respectively, translating native result codes and diagnostics into
+`InvalidOperationException`, and an incompatible ABI into
+`NotSupportedException`. `EngineAudioConfiguration.SampleRate` left at `0`
+and `EngineAudioConfiguration.SpeakerLayout` left at
+`EngineSpeakerLayout.Default` resolve to the documented defaults (48 kHz,
+stereo), matching the native behavior described below.
+
+## Native Contract
 
 Castor Engine defines a versioned native audio configuration contract,
 `castor_engine_audio_config_t`, and a standalone validation entry point,
@@ -17,7 +46,7 @@ config.speaker_layout = CASTOR_ENGINE_SPEAKERS_STEREO;
 castor_engine_result_t result = castor_engine_validate_audio_config(&config);
 ```
 
-## Fields
+### Fields
 
 - `sample_rate`: the audio sample rate, in Hz. A value of `0` resolves to the
   default of 48000 Hz. Supported sample rates are 44100 Hz and 48000 Hz.
@@ -26,7 +55,7 @@ castor_engine_result_t result = castor_engine_validate_audio_config(&config);
   (`0`) resolves to `CASTOR_ENGINE_SPEAKERS_STEREO`. Supported layouts are
   `CASTOR_ENGINE_SPEAKERS_MONO` and `CASTOR_ENGINE_SPEAKERS_STEREO`.
 
-## Validation
+### Validation
 
 `castor_engine_validate_audio_config` rejects:
 
@@ -43,7 +72,7 @@ received, and the supported values. A configuration with `sample_rate` and
 `speaker_layout` left at `0` validates successfully and resolves to the
 documented defaults (48 kHz, stereo).
 
-## OBS Audio Subsystem Lifecycle
+### OBS Audio Subsystem Lifecycle
 
 `castor_engine_configure_audio` initializes the OBS audio subsystem from a
 validated configuration, once the engine has been initialized. It requires
@@ -72,7 +101,7 @@ configuration into a caller-provided buffer; it never hands back an OBS
 type or a pointer owned by the engine. The caller must set `struct_size`
 before calling.
 
-### Lifecycle rules
+#### Lifecycle rules
 
 - Configuring before the engine is initialized returns
   `CASTOR_ENGINE_NOT_INITIALIZED`.
