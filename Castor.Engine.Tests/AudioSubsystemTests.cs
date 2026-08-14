@@ -79,6 +79,27 @@ namespace Castor.Engine.Tests
         }
 
         [StaFact]
+        public void ConfigureAudioShouldRejectReconfigurationWhileRecordingIsActive()
+        {
+            // Castor Engine does not track recording state yet (see issue #14).
+            // OBS itself has no runtime audio reconfiguration path at all:
+            // obs_reset_audio() silently keeps the existing settings once
+            // configured, whether or not a recording is active. Rejecting
+            // every differing reconfiguration unconditionally is what makes
+            // this safe for an active recording - there is no state in which
+            // OBS would actually swap settings out from under one.
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            NativeAudioMethods.ConfigureAudio(
+                NativeAudioMethods.CreateConfig(48000, NativeAudioMethods.StereoSpeakerLayout));
+
+            var result = NativeAudioMethods.ConfigureAudio(
+                NativeAudioMethods.CreateConfig(48000, NativeAudioMethods.MonoSpeakerLayout));
+
+            Assert.Equal(NativeAudioResult.AudioAlreadyConfigured, result);
+            Assert.True(IsAudioConfigured());
+        }
+
+        [StaFact]
         public void GetAudioConfigShouldReturnEffectiveConfiguration()
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
@@ -121,6 +142,20 @@ namespace Castor.Engine.Tests
 
             Assert.Equal(NativeAudioResult.Ok, result);
             Assert.True(IsAudioConfigured());
+        }
+
+        [Fact(Skip =
+            "castor_engine_configure_audio's OBS-rejection path " +
+            "(CASTOR_ENGINE_AUDIO_CONFIGURATION_FAILED) cannot be reached " +
+            "through the public API without a physical device or a fault-" +
+            "injection seam in OBS. obs_reset_audio only fails when OBS " +
+            "itself isn't running, which is already surfaced separately as " +
+            "CASTOR_ENGINE_NOT_INITIALIZED before OBS is ever called, or " +
+            "when passed a null pointer, which castor_engine_configure_audio " +
+            "never does. There is no black-box way to force libobs's " +
+            "internal audio_output_open to fail.")]
+        public void ConfigureAudioShouldPropagateObsInitializationFailures()
+        {
         }
 
         [StaFact]
