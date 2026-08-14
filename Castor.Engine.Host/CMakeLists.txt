@@ -1,5 +1,6 @@
 ﻿add_library(Castor.Engine.Host SHARED
     src/castor_engine.cpp
+    src/audio_configuration.cpp
     src/video_configuration.cpp
 )
 

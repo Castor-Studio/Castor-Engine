@@ -17,7 +17,7 @@ extern "C"
 {
 #endif
 
-#define CASTOR_ENGINE_ABI_VERSION 3
+#define CASTOR_ENGINE_ABI_VERSION 4
 #define CASTOR_ENGINE_VERSION "0.1.0-alpha.1"
 
     CASTOR_ENGINE_API uint32_t castor_engine_get_abi_version(void);
@@ -39,7 +39,16 @@ extern "C"
         CASTOR_ENGINE_VIDEO_CURRENTLY_ACTIVE = 8,
         CASTOR_ENGINE_VIDEO_MODULE_NOT_FOUND = 9,
         CASTOR_ENGINE_VIDEO_CONFIGURATION_FAILED = 10,
+        CASTOR_ENGINE_AUDIO_UNSUPPORTED_SAMPLE_RATE = 11,
+        CASTOR_ENGINE_AUDIO_UNSUPPORTED_SPEAKER_LAYOUT = 12,
     } castor_engine_result_t;
+
+    typedef enum castor_engine_speaker_layout
+    {
+        CASTOR_ENGINE_SPEAKERS_DEFAULT = 0,
+        CASTOR_ENGINE_SPEAKERS_MONO = 1,
+        CASTOR_ENGINE_SPEAKERS_STEREO = 2,
+    } castor_engine_speaker_layout_t;
 
     typedef struct castor_engine_config
     {
@@ -59,6 +68,19 @@ extern "C"
         uint32_t fps_denominator;
     } castor_engine_video_config_t;
 
+    /**
+     * A sample_rate of 0 resolves to the default of 48000 Hz. A speaker_layout
+     * of CASTOR_ENGINE_SPEAKERS_DEFAULT resolves to CASTOR_ENGINE_SPEAKERS_STEREO.
+     * The initial implementation supports 44100 Hz and 48000 Hz sample rates,
+     * and mono/stereo speaker layouts.
+     */
+    typedef struct castor_engine_audio_config
+    {
+        uint32_t struct_size;
+        uint32_t sample_rate;
+        uint32_t speaker_layout;
+    } castor_engine_audio_config_t;
+
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_initialize(const castor_engine_config_t* config);
 
     CASTOR_ENGINE_API const char* castor_engine_get_last_error(void);
@@ -70,6 +92,13 @@ extern "C"
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_configure_video(const castor_engine_video_config_t* config);
 
     CASTOR_ENGINE_API uint8_t castor_engine_is_video_configured(void);
+
+    /**
+     * Validates an audio configuration in isolation. This does not require the
+     * engine or OBS to be initialized and does not apply the configuration.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_validate_audio_config(
+        const castor_engine_audio_config_t* config);
 
     CASTOR_ENGINE_API void castor_engine_shutdown(void);
 

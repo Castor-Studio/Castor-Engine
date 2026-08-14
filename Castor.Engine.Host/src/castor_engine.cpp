@@ -1,5 +1,6 @@
 #include "castor_engine.h"
 
+#include "audio_configuration.h"
 #include "video_configuration.h"
 
 #include <filesystem>
@@ -329,6 +330,20 @@ uint8_t castor_engine_is_video_configured(void)
 {
     std::scoped_lock lock(lifecycle_mutex);
     return video.is_configured() ? 1U : 0U;
+}
+
+castor_engine_result_t castor_engine_validate_audio_config(const castor_engine_audio_config_t* config)
+{
+    last_error.clear();
+
+    castor::engine::detail::audio_configuration_result result = castor::engine::detail::validate_audio_config(config);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
 }
 
 void castor_engine_shutdown(void)
