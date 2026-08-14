@@ -17,7 +17,7 @@ extern "C"
 {
 #endif
 
-#define CASTOR_ENGINE_ABI_VERSION 4
+#define CASTOR_ENGINE_ABI_VERSION 5
 #define CASTOR_ENGINE_VERSION "0.1.0-alpha.1"
 
     CASTOR_ENGINE_API uint32_t castor_engine_get_abi_version(void);
@@ -41,6 +41,8 @@ extern "C"
         CASTOR_ENGINE_VIDEO_CONFIGURATION_FAILED = 10,
         CASTOR_ENGINE_AUDIO_UNSUPPORTED_SAMPLE_RATE = 11,
         CASTOR_ENGINE_AUDIO_UNSUPPORTED_SPEAKER_LAYOUT = 12,
+        CASTOR_ENGINE_AUDIO_ALREADY_CONFIGURED = 13,
+        CASTOR_ENGINE_AUDIO_CONFIGURATION_FAILED = 14,
     } castor_engine_result_t;
 
     typedef enum castor_engine_speaker_layout
@@ -99,6 +101,29 @@ extern "C"
      */
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_validate_audio_config(
         const castor_engine_audio_config_t* config);
+
+    /**
+     * Initializes or re-applies the OBS audio subsystem from a validated
+     * configuration. Requires no physical playback or capture device.
+     *
+     * Repeating the same effective configuration is a no-op. OBS does not
+     * support runtime audio reconfiguration, so requesting different values
+     * while the subsystem is already configured is rejected with
+     * CASTOR_ENGINE_AUDIO_ALREADY_CONFIGURED; shut down the engine first to
+     * apply different audio settings.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_configure_audio(
+        const castor_engine_audio_config_t* config);
+
+    CASTOR_ENGINE_API uint8_t castor_engine_is_audio_configured(void);
+
+    /**
+     * Retrieves the engine-owned effective audio configuration. The caller
+     * must set struct_size before calling. Returns 0 when the audio
+     * subsystem is not configured, the pointer is null, or struct_size is
+     * too small.
+     */
+    CASTOR_ENGINE_API uint8_t castor_engine_get_audio_config(castor_engine_audio_config_t* out_config);
 
     CASTOR_ENGINE_API void castor_engine_shutdown(void);
 

@@ -1,6 +1,7 @@
 #include "castor_engine.h"
 
 #include "audio_configuration.h"
+#include "audio_subsystem.h"
 #include "video_configuration.h"
 
 #include <filesystem>
@@ -18,6 +19,7 @@ std::string registered_libobs_data_path;
 thread_local std::string last_error;
 
 castor::engine::detail::video_subsystem video;
+castor::engine::detail::audio_subsystem audio;
 
 std::string path_to_utf8(const std::filesystem::path& path)
 {
@@ -116,6 +118,7 @@ void rollback_startup(bool started_here)
 {
     modules_loaded = false;
     video.reset();
+    audio.reset();
     unregister_libobs_data_path();
 
     if (started_here && obs_initialized())
@@ -346,6 +349,56 @@ castor_engine_result_t castor_engine_validate_audio_config(const castor_engine_a
     return result.code;
 }
 
+castor_engine_result_t castor_engine_configure_audio(const castor_engine_audio_config_t* config)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    castor::engine::detail::audio_lifecycle_result result =
+        audio.configure(config, obs_initialized() && modules_loaded);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+uint8_t castor_engine_is_audio_configured(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return audio.is_configured() ? 1U : 0U;
+}
+
+uint8_t castor_engine_get_audio_config(castor_engine_audio_config_t* out_config)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (out_config == nullptr)
+    {
+        set_last_error("The output audio configuration pointer must not be null.");
+        return 0U;
+    }
+
+    if (out_config->struct_size < sizeof(castor_engine_audio_config_t))
+    {
+        set_last_error("The output audio configuration structure is too small. Expected at least " +
+                       std::to_string(sizeof(castor_engine_audio_config_t)) + " bytes, received " +
+                       std::to_string(out_config->struct_size) + ".");
+        return 0U;
+    }
+
+    if (!audio.get_effective_config(out_config))
+    {
+        set_last_error("The audio subsystem is not configured.");
+        return 0U;
+    }
+
+    return 1U;
+}
+
 void castor_engine_shutdown(void)
 {
     std::scoped_lock lock(lifecycle_mutex);
@@ -357,6 +410,7 @@ void castor_engine_shutdown(void)
 
     modules_loaded = false;
     video.reset();
+    audio.reset();
     unregister_libobs_data_path();
     last_error.clear();
 }

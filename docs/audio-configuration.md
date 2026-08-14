@@ -6,8 +6,7 @@ Castor Engine defines a versioned native audio configuration contract,
 
 Validation is independent of engine and OBS initialization: it can be called
 and tested without an initialized engine or OBS instance, and does not apply
-the configuration to OBS. Applying a validated configuration to the OBS audio
-subsystem is tracked separately.
+the configuration to OBS.
 
 ```c
 castor_engine_audio_config_t config = {0};
@@ -43,3 +42,52 @@ Each rejection sets a descriptive message retrievable through
 received, and the supported values. A configuration with `sample_rate` and
 `speaker_layout` left at `0` validates successfully and resolves to the
 documented defaults (48 kHz, stereo).
+
+## OBS Audio Subsystem Lifecycle
+
+`castor_engine_configure_audio` initializes the OBS audio subsystem from a
+validated configuration, once the engine has been initialized. It requires
+no physical playback or capture device: OBS audio is a software mixer, and
+no audio source is created.
+
+```c
+EngineRuntime.Initialize(...); // castor_engine_initialize
+
+castor_engine_audio_config_t config = {0};
+config.struct_size = sizeof(config);
+config.sample_rate = 48000;
+config.speaker_layout = CASTOR_ENGINE_SPEAKERS_STEREO;
+
+castor_engine_result_t result = castor_engine_configure_audio(&config);
+
+uint8_t is_configured = castor_engine_is_audio_configured();
+
+castor_engine_audio_config_t effective = {0};
+effective.struct_size = sizeof(effective);
+uint8_t has_config = castor_engine_get_audio_config(&effective);
+```
+
+`castor_engine_get_audio_config` copies the engine-owned effective
+configuration into a caller-provided buffer; it never hands back an OBS
+type or a pointer owned by the engine. The caller must set `struct_size`
+before calling.
+
+### Lifecycle rules
+
+- Configuring before the engine is initialized returns
+  `CASTOR_ENGINE_NOT_INITIALIZED`.
+- Repeating the same effective configuration is a no-op that returns
+  `CASTOR_ENGINE_OK`.
+- OBS does not support runtime audio reconfiguration: once configured,
+  `obs_reset_audio` silently keeps the existing settings active instead of
+  reporting a failure. To avoid the engine believing new settings were
+  applied while OBS silently kept the old ones running, requesting
+  different `sample_rate`/`speaker_layout` values while already configured
+  is rejected with `CASTOR_ENGINE_AUDIO_ALREADY_CONFIGURED` — including
+  while a recording is active, since no runtime reconfiguration path
+  exists. Shut down the engine to change the audio configuration.
+- If OBS fails to initialize the audio subsystem, `castor_engine_configure_audio`
+  returns `CASTOR_ENGINE_AUDIO_CONFIGURATION_FAILED`.
+- `castor_engine_shutdown` releases the OBS audio subsystem through the
+  normal OBS shutdown and clears the engine's audio state, so the full
+  initialize/configure/shutdown lifecycle can run again.
