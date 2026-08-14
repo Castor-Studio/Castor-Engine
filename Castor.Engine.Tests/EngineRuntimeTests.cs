@@ -85,6 +85,48 @@ namespace Castor.Engine.Tests
         }
 
         [StaFact]
+        public void ConfigureVideoShouldAcceptObsAlignedOutputWidth()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            var configuration = new EngineVideoConfiguration(
+                1280,
+                720,
+                854,
+                480,
+                30,
+                1);
+
+            EngineRuntime.ConfigureVideo(configuration);
+
+            Assert.True(EngineRuntime.IsVideoConfigured);
+        }
+
+        [StaFact]
+        public void ConfigureVideoShouldTreatEquivalentOutputWidthsAsIdempotent()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            var unalignedConfiguration = new EngineVideoConfiguration(
+                1280,
+                720,
+                854,
+                480,
+                30,
+                1);
+            var alignedConfiguration = new EngineVideoConfiguration(
+                1280,
+                720,
+                852,
+                480,
+                30,
+                1);
+
+            EngineRuntime.ConfigureVideo(unalignedConfiguration);
+            EngineRuntime.ConfigureVideo(alignedConfiguration);
+
+            Assert.True(EngineRuntime.IsVideoConfigured);
+        }
+
+        [StaFact]
         public void ConfigureVideoShouldRejectOddDimensions()
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());

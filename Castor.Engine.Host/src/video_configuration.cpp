@@ -11,6 +11,15 @@ namespace
 constexpr uint32_t maximum_video_dimension = 16384;
 constexpr const char* windows_graphics_module = "libobs-d3d11";
 
+constexpr uint32_t align_output_width_for_obs(uint32_t width)
+{
+    return width & ~uint32_t{3};
+}
+
+static_assert(align_output_width_for_obs(854) == 852);
+static_assert(align_output_width_for_obs(1278) == 1276);
+static_assert(align_output_width_for_obs(1280) == 1280);
+
 video_configuration_result failure(castor_engine_result_t code, std::string message)
 {
     return {code, std::move(message)};
@@ -117,21 +126,24 @@ video_configuration_result video_subsystem::configure(const castor_engine_video_
         return validation_result;
     }
 
+    castor_engine_video_config_t effective_config = *config;
+    effective_config.output_width = align_output_width_for_obs(effective_config.output_width);
+
     obs_video_info active_video_info{};
 
-    if (configured_ && video_configs_match(current_config_, *config) && obs_get_video_info(&active_video_info))
+    if (configured_ && video_configs_match(current_config_, effective_config) && obs_get_video_info(&active_video_info))
     {
         return {CASTOR_ENGINE_OK, {}};
     }
 
     obs_video_info video_info{};
     video_info.graphics_module = windows_graphics_module;
-    video_info.fps_num = config->fps_numerator;
-    video_info.fps_den = config->fps_denominator;
-    video_info.base_width = config->base_width;
-    video_info.base_height = config->base_height;
-    video_info.output_width = config->output_width;
-    video_info.output_height = config->output_height;
+    video_info.fps_num = effective_config.fps_numerator;
+    video_info.fps_den = effective_config.fps_denominator;
+    video_info.base_width = effective_config.base_width;
+    video_info.base_height = effective_config.base_height;
+    video_info.output_width = effective_config.output_width;
+    video_info.output_height = effective_config.output_height;
     video_info.output_format = VIDEO_FORMAT_NV12;
     video_info.adapter = 0;
     video_info.gpu_conversion = true;
@@ -143,7 +155,7 @@ video_configuration_result video_subsystem::configure(const castor_engine_video_
 
     if (result.code == CASTOR_ENGINE_OK)
     {
-        current_config_ = *config;
+        current_config_ = effective_config;
         configured_ = true;
     }
     else if (!obs_get_video_info(&active_video_info))

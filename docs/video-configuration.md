@@ -25,10 +25,13 @@ and uses the relative graphics-module name `libobs-d3d11`. It applies
 deterministic internal defaults: NV12 output, Rec. 709, partial range, bicubic
 scaling, adapter zero, and GPU color conversion.
 
-All dimensions must be even and between 2 and 16384 pixels. The FPS numerator
-and denominator must both be non-zero. Repeating the same configuration is a
-no-op, while OBS failures are returned through Castor result codes and surfaced
-as descriptive managed exceptions.
+All dimensions must be even and between 2 and 16384 pixels. OBS aligns the
+effective output width down to a multiple of four, so a requested width of 854
+remains unchanged in the caller-owned configuration while the video runtime
+uses 852. Configurations with the same effective width are treated as
+equivalent. The FPS numerator and denominator must both be non-zero. Repeating
+the same effective configuration is a no-op, while OBS failures are returned
+through Castor result codes and surfaced as descriptive managed exceptions.
 
 Calling `EngineRuntime.Shutdown()` clears the configured-video state along
 with the rest of the OBS runtime.
