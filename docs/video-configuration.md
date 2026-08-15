@@ -65,3 +65,6 @@ creation are rolled back before the diagnostic is returned.
 Shutdown first disconnects the scene, then releases the retained source and
 scene references before stopping OBS. The complete initialize, configure,
 create, and shutdown lifecycle can therefore be repeated in the same process.
+
+See [Default OBS Main Scene](main-scene.md) for the public contract, native
+resource lifecycle, diagnostics, and automated coverage.

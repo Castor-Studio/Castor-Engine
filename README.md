@@ -28,3 +28,9 @@ This repository does not contain:
 - business and product workflows;
 - AI models or AI decision services;
 - user authentication and account management.
+
+## Documentation
+
+- [OBS SDK workflow](docs/obs-sdk-workflow.md)
+- [OBS video configuration](docs/video-configuration.md)
+- [Default OBS main scene](docs/main-scene.md)
