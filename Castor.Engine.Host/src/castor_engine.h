@@ -99,8 +99,8 @@ extern "C"
      * Validates an audio configuration in isolation. This does not require the
      * engine or OBS to be initialized and does not apply the configuration.
      */
-    CASTOR_ENGINE_API castor_engine_result_t castor_engine_validate_audio_config(
-        const castor_engine_audio_config_t* config);
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_validate_audio_config(const castor_engine_audio_config_t* config);
 
     /**
      * Initializes or re-applies the OBS audio subsystem from a validated
@@ -112,8 +112,7 @@ extern "C"
      * CASTOR_ENGINE_AUDIO_ALREADY_CONFIGURED; shut down the engine first to
      * apply different audio settings.
      */
-    CASTOR_ENGINE_API castor_engine_result_t castor_engine_configure_audio(
-        const castor_engine_audio_config_t* config);
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_configure_audio(const castor_engine_audio_config_t* config);
 
     CASTOR_ENGINE_API uint8_t castor_engine_is_audio_configured(void);
 

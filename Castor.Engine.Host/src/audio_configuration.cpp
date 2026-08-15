@@ -50,8 +50,8 @@ audio_configuration_result validate_audio_config(const castor_engine_audio_confi
     }
 
     const uint32_t speaker_layout = config->speaker_layout == CASTOR_ENGINE_SPEAKERS_DEFAULT
-                                         ? static_cast<uint32_t>(default_speaker_layout)
-                                         : config->speaker_layout;
+                                        ? static_cast<uint32_t>(default_speaker_layout)
+                                        : config->speaker_layout;
 
     if (!is_supported_speaker_layout(speaker_layout))
     {
