@@ -17,7 +17,7 @@ extern "C"
 {
 #endif
 
-#define CASTOR_ENGINE_ABI_VERSION 3
+#define CASTOR_ENGINE_ABI_VERSION 4
 #define CASTOR_ENGINE_VERSION "0.1.0-alpha.1"
 
     CASTOR_ENGINE_API uint32_t castor_engine_get_abi_version(void);
@@ -39,6 +39,12 @@ extern "C"
         CASTOR_ENGINE_VIDEO_CURRENTLY_ACTIVE = 8,
         CASTOR_ENGINE_VIDEO_MODULE_NOT_FOUND = 9,
         CASTOR_ENGINE_VIDEO_CONFIGURATION_FAILED = 10,
+        CASTOR_ENGINE_VIDEO_NOT_CONFIGURED = 11,
+        CASTOR_ENGINE_SCENE_CREATION_FAILED = 12,
+        CASTOR_ENGINE_SCENE_SOURCE_UNAVAILABLE = 13,
+        CASTOR_ENGINE_SCENE_SOURCE_CREATION_FAILED = 14,
+        CASTOR_ENGINE_SCENE_SOURCE_ADD_FAILED = 15,
+        CASTOR_ENGINE_SCENE_ACTIVATION_FAILED = 16,
     } castor_engine_result_t;
 
     typedef struct castor_engine_config
@@ -70,6 +76,10 @@ extern "C"
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_configure_video(const castor_engine_video_config_t* config);
 
     CASTOR_ENGINE_API uint8_t castor_engine_is_video_configured(void);
+
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_create_main_scene(void);
+
+    CASTOR_ENGINE_API uint8_t castor_engine_has_active_scene(void);
 
     CASTOR_ENGINE_API void castor_engine_shutdown(void);
 

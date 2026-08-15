@@ -16,6 +16,12 @@ namespace Castor.Engine.Interop
         VideoCurrentlyActive = 8,
         VideoModuleNotFound = 9,
         VideoConfigurationFailed = 10,
+        VideoNotConfigured = 11,
+        SceneCreationFailed = 12,
+        SceneSourceUnavailable = 13,
+        SceneSourceCreationFailed = 14,
+        SceneSourceAddFailed = 15,
+        SceneActivationFailed = 16,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -98,6 +104,18 @@ namespace Castor.Engine.Interop
             EntryPoint = "castor_engine_is_video_configured")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial byte IsVideoConfigured();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_create_main_scene")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult CreateMainScene();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_has_active_scene")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte HasActiveScene();
 
         [LibraryImport(
             LibraryName,
