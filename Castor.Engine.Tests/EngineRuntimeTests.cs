@@ -196,11 +196,79 @@ namespace Castor.Engine.Tests
             Assert.True(EngineRuntime.IsVideoConfigured);
         }
 
+        [Fact]
+        public void CreateMainSceneShouldRequireInitialization()
+        {
+            var exception = Assert.Throws<InvalidOperationException>(
+                EngineRuntime.CreateMainScene);
+
+            Assert.Contains("NotInitialized", exception.Message);
+            Assert.Contains("must be initialized", exception.Message);
+            Assert.False(EngineRuntime.HasActiveScene);
+        }
+
+        [StaFact]
+        public void CreateMainSceneShouldRequireVideoConfiguration()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+
+            var exception = Assert.Throws<InvalidOperationException>(
+                EngineRuntime.CreateMainScene);
+
+            Assert.Contains("VideoNotConfigured", exception.Message);
+            Assert.Contains("must be configured", exception.Message);
+            Assert.False(EngineRuntime.HasActiveScene);
+        }
+
+        [StaFact]
+        public void CreateMainSceneShouldCreateAndActivateScene()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
+
+            EngineRuntime.CreateMainScene();
+
+            Assert.True(EngineRuntime.HasActiveScene);
+        }
+
+        [StaFact]
+        public void CreateMainSceneShouldBeIdempotent()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
+
+            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateMainScene();
+
+            Assert.True(EngineRuntime.HasActiveScene);
+        }
+
+        [StaFact]
+        public void MainSceneLifecycleShouldWorkAfterRuntimeRestart()
+        {
+            var runtimeConfiguration = CreateRuntimeConfiguration();
+            var videoConfiguration = CreateVideoConfiguration();
+
+            EngineRuntime.Initialize(runtimeConfiguration);
+            EngineRuntime.ConfigureVideo(videoConfiguration);
+            EngineRuntime.CreateMainScene();
+            EngineRuntime.Shutdown();
+
+            Assert.False(EngineRuntime.HasActiveScene);
+
+            EngineRuntime.Initialize(runtimeConfiguration);
+            EngineRuntime.ConfigureVideo(videoConfiguration);
+            EngineRuntime.CreateMainScene();
+
+            Assert.True(EngineRuntime.HasActiveScene);
+        }
+
         [StaFact]
         public void ShutdownShouldBeIdempotent()
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
+            EngineRuntime.CreateMainScene();
 
             EngineRuntime.Shutdown();
             EngineRuntime.Shutdown();
@@ -208,6 +276,7 @@ namespace Castor.Engine.Tests
             Assert.False(EngineRuntime.IsInitialized);
             Assert.Equal(0U, EngineRuntime.LoadedModuleCount);
             Assert.False(EngineRuntime.IsVideoConfigured);
+            Assert.False(EngineRuntime.HasActiveScene);
         }
 
         private static EngineRuntimeConfiguration CreateRuntimeConfiguration()

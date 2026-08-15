@@ -178,6 +178,20 @@ bool video_subsystem::is_configured()
     return configured_;
 }
 
+bool video_subsystem::try_get_base_size(uint32_t& width, uint32_t& height)
+{
+    if (!is_configured())
+    {
+        width = 0;
+        height = 0;
+        return false;
+    }
+
+    width = current_config_.base_width;
+    height = current_config_.base_height;
+    return true;
+}
+
 void video_subsystem::reset() noexcept
 {
     configured_ = false;

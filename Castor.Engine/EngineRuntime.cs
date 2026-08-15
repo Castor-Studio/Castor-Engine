@@ -31,6 +31,12 @@ namespace Castor.Engine
         /// </summary>
         public static bool IsAudioConfigured =>
             NativeMethods.IsAudioConfigured() != 0;
+      
+        /// Gets whether the engine-owned main scene exists and is connected
+        /// to the primary OBS video output.
+        /// </summary>
+        public static bool HasActiveScene =>
+            NativeMethods.HasActiveScene() != 0;
 
         /// <summary>
         /// Initializes the OBS runtime and loads the packaged OBS modules.

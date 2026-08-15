@@ -138,6 +138,12 @@ jobs:
       - name: Build engine
         run: cmake --build --preset windows-x64
 
+      - name: Test native engine
+        run: >
+          ctest --test-dir build_x64
+          --build-config RelWithDebInfo
+          --output-on-failure
+
       - name: Install engine
         run: >
           cmake --install build_x64

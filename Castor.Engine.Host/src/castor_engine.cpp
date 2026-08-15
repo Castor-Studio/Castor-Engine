@@ -2,6 +2,8 @@
 
 #include "audio_configuration.h"
 #include "audio_subsystem.h"
+#include "main_scene.h"
+#include "obs_scene_backend.h"
 #include "video_configuration.h"
 
 #include <filesystem>
@@ -20,6 +22,8 @@ thread_local std::string last_error;
 
 castor::engine::detail::video_subsystem video;
 castor::engine::detail::audio_subsystem audio;
+castor::engine::detail::obs_scene_backend scene_backend;
+castor::engine::detail::main_scene_subsystem main_scene(scene_backend);
 
 std::string path_to_utf8(const std::filesystem::path& path)
 {
@@ -117,6 +121,7 @@ std::string describe_module_failures(const obs_module_failure_info& failure_info
 void rollback_startup(bool started_here)
 {
     modules_loaded = false;
+    main_scene.reset();
     video.reset();
     audio.reset();
     unregister_libobs_data_path();
@@ -399,9 +404,60 @@ uint8_t castor_engine_get_audio_config(castor_engine_audio_config_t* out_config)
     return 1U;
 }
 
+castor_engine_result_t castor_engine_create_main_scene(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    const bool runtime_ready = obs_initialized() && modules_loaded;
+    uint32_t base_width = 0;
+    uint32_t base_height = 0;
+    const bool video_ready = runtime_ready && video.try_get_base_size(base_width, base_height);
+
+    try
+    {
+        castor::engine::detail::main_scene_result result =
+            main_scene.create(runtime_ready, video_ready, base_width, base_height);
+
+        if (result.code != CASTOR_ENGINE_OK)
+        {
+            set_last_error(std::move(result.message));
+        }
+
+        return result.code;
+    }
+    catch (const std::exception& exception)
+    {
+        main_scene.reset();
+        set_last_error(std::string("Unexpected native main-scene failure: ") + exception.what());
+        return CASTOR_ENGINE_SCENE_CREATION_FAILED;
+    }
+    catch (...)
+    {
+        main_scene.reset();
+        set_last_error("Unexpected native main-scene failure.");
+        return CASTOR_ENGINE_SCENE_CREATION_FAILED;
+    }
+}
+
+uint8_t castor_engine_has_active_scene(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+
+    if (!obs_initialized() || !modules_loaded)
+    {
+        return 0U;
+    }
+
+    return main_scene.is_active() ? 1U : 0U;
+}
+
 void castor_engine_shutdown(void)
 {
     std::scoped_lock lock(lifecycle_mutex);
+
+    main_scene.reset();
+    video.reset();
 
     if (obs_initialized())
     {
@@ -409,8 +465,10 @@ void castor_engine_shutdown(void)
     }
 
     modules_loaded = false;
+  
     video.reset();
     audio.reset();
+  
     unregister_libobs_data_path();
     last_error.clear();
 }
