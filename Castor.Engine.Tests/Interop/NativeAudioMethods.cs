@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Castor.Engine.Tests.Interop
@@ -27,7 +26,7 @@ namespace Castor.Engine.Tests.Interop
     /// Castor.Engine.Host to exercise it in isolation from the managed
     /// audio API, which does not exist yet.
     /// </summary>
-    internal static partial class NativeAudioMethods
+    internal static class NativeAudioMethods
     {
         private const string LibraryName = "Castor.Engine.Host";
 
@@ -35,41 +34,41 @@ namespace Castor.Engine.Tests.Interop
         internal const uint MonoSpeakerLayout = 1;
         internal const uint StereoSpeakerLayout = 2;
 
-        [LibraryImport(
+        [DllImport(
             LibraryName,
-            EntryPoint = "castor_engine_get_last_error")]
-        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial nint GetLastError();
+            EntryPoint = "castor_engine_get_last_error",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern nint GetLastError();
 
-        [LibraryImport(
+        [DllImport(
             LibraryName,
-            EntryPoint = "castor_engine_validate_audio_config")]
-        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial NativeAudioResult ValidateAudioConfig(in NativeAudioConfig config);
+            EntryPoint = "castor_engine_validate_audio_config",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern NativeAudioResult ValidateAudioConfig(in NativeAudioConfig config);
 
-        [LibraryImport(
+        [DllImport(
             LibraryName,
-            EntryPoint = "castor_engine_validate_audio_config")]
-        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial NativeAudioResult ValidateAudioConfigRaw(nint config);
+            EntryPoint = "castor_engine_validate_audio_config",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern NativeAudioResult ValidateAudioConfigRaw(nint config);
 
-        [LibraryImport(
+        [DllImport(
             LibraryName,
-            EntryPoint = "castor_engine_configure_audio")]
-        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial NativeAudioResult ConfigureAudio(in NativeAudioConfig config);
+            EntryPoint = "castor_engine_configure_audio",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern NativeAudioResult ConfigureAudio(in NativeAudioConfig config);
 
-        [LibraryImport(
+        [DllImport(
             LibraryName,
-            EntryPoint = "castor_engine_is_audio_configured")]
-        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial byte IsAudioConfigured();
+            EntryPoint = "castor_engine_is_audio_configured",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte IsAudioConfigured();
 
-        [LibraryImport(
+        [DllImport(
             LibraryName,
-            EntryPoint = "castor_engine_get_audio_config")]
-        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial byte GetAudioConfig(ref NativeAudioConfig config);
+            EntryPoint = "castor_engine_get_audio_config",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte GetAudioConfig(ref NativeAudioConfig config);
 
         internal static string? GetLastErrorMessage()
         {
