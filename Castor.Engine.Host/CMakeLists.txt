@@ -1,8 +1,10 @@
-﻿add_library(Castor.Engine.Host SHARED
+add_library(Castor.Engine.Host SHARED
     src/castor_engine.cpp
+    src/video_configuration.cpp
+    src/audio_configuration.cpp
+    src/audio_subsystem.cpp
     src/main_scene.cpp
     src/obs_scene_backend.cpp
-    src/video_configuration.cpp
 )
 
 target_include_directories(

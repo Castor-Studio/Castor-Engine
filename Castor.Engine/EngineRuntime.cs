@@ -27,6 +27,12 @@ namespace Castor.Engine
             NativeMethods.IsVideoConfigured() != 0;
 
         /// <summary>
+        /// Gets whether the OBS audio subsystem is configured.
+        /// </summary>
+        public static bool IsAudioConfigured =>
+            NativeMethods.IsAudioConfigured() != 0;
+
+        /// <summary>
         /// Gets whether the engine-owned main scene exists and is connected
         /// to the primary OBS video output.
         /// </summary>
@@ -151,6 +157,75 @@ namespace Castor.Engine
         }
 
         /// <summary>
+        /// Configures the OBS audio subsystem. Requires no physical playback
+        /// or capture device.
+        /// </summary>
+        /// <param name="configuration">
+        /// The audio sample rate and speaker layout.
+        /// </param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown when <paramref name="configuration"/> is null.
+        /// </exception>
+        /// <exception cref="NotSupportedException">
+        /// Thrown when the native and managed ABI versions are incompatible.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the engine is not initialized, the requested
+        /// configuration is invalid or unsupported, OBS cannot configure
+        /// audio with the requested settings, or the audio subsystem is
+        /// already configured with different settings. OBS does not support
+        /// runtime audio reconfiguration, so shut down the engine first to
+        /// apply different audio settings.
+        /// </exception>
+        public static void ConfigureAudio(EngineAudioConfiguration configuration)
+        {
+            ArgumentNullException.ThrowIfNull(configuration);
+            EngineInfo.ValidateCompatibility();
+
+            var nativeConfiguration = new NativeEngineAudioConfiguration
+            {
+                StructSize = checked(
+                    (uint)Marshal.SizeOf<NativeEngineAudioConfiguration>()),
+                SampleRate = configuration.SampleRate,
+                SpeakerLayout = (uint)configuration.SpeakerLayout,
+            };
+
+            var result = NativeMethods.ConfigureAudio(in nativeConfiguration);
+
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException(
+                    "configure OBS audio",
+                    result);
+            }
+        }
+
+        /// <summary>
+        /// Gets the effective audio configuration.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the audio subsystem is not configured.
+        /// </exception>
+        public static EngineAudioConfiguration GetAudioConfiguration()
+        {
+            var nativeConfiguration = new NativeEngineAudioConfiguration
+            {
+                StructSize = checked(
+                    (uint)Marshal.SizeOf<NativeEngineAudioConfiguration>()),
+            };
+
+            if (NativeMethods.GetAudioConfig(ref nativeConfiguration) == 0)
+            {
+                throw CreateNativeOperationException(
+                    "retrieve the audio configuration");
+            }
+
+            return new EngineAudioConfiguration(
+                nativeConfiguration.SampleRate,
+                (EngineSpeakerLayout)nativeConfiguration.SpeakerLayout);
+        }
+
+        /// <summary>
         /// Creates the engine-owned main scene, adds a solid-color source,
         /// and connects it to the primary OBS video output.
         /// </summary>
@@ -190,17 +265,27 @@ namespace Castor.Engine
             string operation,
             NativeEngineResult result)
         {
+            return new InvalidOperationException(
+                $"Failed to {operation} ({result}): {GetLastErrorDetail()}");
+        }
+
+        private static InvalidOperationException CreateNativeOperationException(
+            string operation)
+        {
+            return new InvalidOperationException(
+                $"Failed to {operation}: {GetLastErrorDetail()}");
+        }
+
+        private static string GetLastErrorDetail()
+        {
             var errorPointer = NativeMethods.GetLastError();
             var nativeMessage = errorPointer == nint.Zero
                 ? null
                 : Marshal.PtrToStringUTF8(errorPointer);
 
-            var detail = string.IsNullOrWhiteSpace(nativeMessage)
+            return string.IsNullOrWhiteSpace(nativeMessage)
                 ? "The native engine did not provide additional diagnostics."
                 : nativeMessage;
-
-            return new InvalidOperationException(
-                $"Failed to {operation} ({result}): {detail}");
         }
     }
 }

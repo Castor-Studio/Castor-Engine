@@ -11,17 +11,24 @@ namespace Castor.Engine.Interop
         ObsStartupFailed = 3,
         ModuleLoadFailed = 4,
         NotInitialized = 5,
+
         VideoNotSupported = 6,
         VideoInvalidConfiguration = 7,
         VideoCurrentlyActive = 8,
         VideoModuleNotFound = 9,
         VideoConfigurationFailed = 10,
         VideoNotConfigured = 11,
-        SceneCreationFailed = 12,
-        SceneSourceUnavailable = 13,
-        SceneSourceCreationFailed = 14,
-        SceneSourceAddFailed = 15,
-        SceneActivationFailed = 16,
+
+        AudioUnsupportedSampleRate = 12,
+        AudioUnsupportedSpeakerLayout = 13,
+        AudioAlreadyConfigured = 14,
+        AudioConfigurationFailed = 15,
+
+        SceneCreationFailed = 16,
+        SceneSourceUnavailable = 17,
+        SceneSourceCreationFailed = 18,
+        SceneSourceAddFailed = 19,
+        SceneActivationFailed = 20,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -42,6 +49,14 @@ namespace Castor.Engine.Interop
         internal uint OutputHeight;
         internal uint FramesPerSecondNumerator;
         internal uint FramesPerSecondDenominator;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineAudioConfiguration
+    {
+        internal uint StructSize;
+        internal uint SampleRate;
+        internal uint SpeakerLayout;
     }
 
     internal static partial class NativeMethods
@@ -104,6 +119,26 @@ namespace Castor.Engine.Interop
             EntryPoint = "castor_engine_is_video_configured")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial byte IsVideoConfigured();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_configure_audio")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult ConfigureAudio(
+            in NativeEngineAudioConfiguration configuration);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_is_audio_configured")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte IsAudioConfigured();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_audio_config")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte GetAudioConfig(
+            ref NativeEngineAudioConfiguration configuration);
 
         [LibraryImport(
             LibraryName,
