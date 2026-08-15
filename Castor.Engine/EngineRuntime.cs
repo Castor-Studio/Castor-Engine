@@ -27,6 +27,13 @@ namespace Castor.Engine
             NativeMethods.IsVideoConfigured() != 0;
 
         /// <summary>
+        /// Gets whether the engine-owned main scene exists and is connected
+        /// to the primary OBS video output.
+        /// </summary>
+        public static bool HasActiveScene =>
+            NativeMethods.HasActiveScene() != 0;
+
+        /// <summary>
         /// Initializes the OBS runtime and loads the packaged OBS modules.
         /// </summary>
         /// <param name="configuration">
@@ -139,6 +146,34 @@ namespace Castor.Engine
             {
                 throw CreateNativeOperationException(
                     "configure OBS video",
+                    result);
+            }
+        }
+
+        /// <summary>
+        /// Creates the engine-owned main scene, adds a solid-color source,
+        /// and connects it to the primary OBS video output.
+        /// </summary>
+        /// <remarks>
+        /// Repeated calls are idempotent while the main scene remains active.
+        /// </remarks>
+        /// <exception cref="NotSupportedException">
+        /// Thrown when the native and managed ABI versions are incompatible.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the engine or video subsystem is not initialized, or
+        /// when OBS cannot create and activate the main scene.
+        /// </exception>
+        public static void CreateMainScene()
+        {
+            EngineInfo.ValidateCompatibility();
+
+            var result = NativeMethods.CreateMainScene();
+
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException(
+                    "create and activate the main OBS scene",
                     result);
             }
         }

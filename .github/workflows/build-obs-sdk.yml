@@ -290,6 +290,12 @@ jobs:
       - name: Build Castor Engine
         run: cmake --build --preset windows-ci-x64
 
+      - name: Test native Castor Engine
+        run: >
+          ctest --test-dir build_x64
+          --build-config RelWithDebInfo
+          --output-on-failure
+
       - name: Install Castor Engine runtime
         run: >
           cmake --install build_x64

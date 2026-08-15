@@ -19,6 +19,8 @@ class video_subsystem final
 
     bool is_configured();
 
+    bool try_get_base_size(uint32_t& width, uint32_t& height);
+
     void reset() noexcept;
 
   private:
