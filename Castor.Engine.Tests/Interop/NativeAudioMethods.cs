@@ -7,10 +7,10 @@ namespace Castor.Engine.Tests.Interop
         Ok = 0,
         InvalidArgument = 1,
         NotInitialized = 5,
-        AudioUnsupportedSampleRate = 11,
-        AudioUnsupportedSpeakerLayout = 12,
-        AudioAlreadyConfigured = 13,
-        AudioConfigurationFailed = 14,
+        AudioUnsupportedSampleRate = 12,
+        AudioUnsupportedSpeakerLayout = 13,
+        AudioAlreadyConfigured = 14,
+        AudioConfigurationFailed = 15,
     }
 
     [StructLayout(LayoutKind.Sequential)]

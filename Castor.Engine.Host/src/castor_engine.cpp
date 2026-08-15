@@ -465,10 +465,8 @@ void castor_engine_shutdown(void)
     }
 
     modules_loaded = false;
-  
-    video.reset();
     audio.reset();
-  
+
     unregister_libobs_data_path();
     last_error.clear();
 }

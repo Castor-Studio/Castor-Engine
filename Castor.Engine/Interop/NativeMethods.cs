@@ -11,14 +11,14 @@ namespace Castor.Engine.Interop
         ObsStartupFailed = 3,
         ModuleLoadFailed = 4,
         NotInitialized = 5,
-        
+
         VideoNotSupported = 6,
         VideoInvalidConfiguration = 7,
         VideoCurrentlyActive = 8,
         VideoModuleNotFound = 9,
         VideoConfigurationFailed = 10,
         VideoNotConfigured = 11,
-        
+
         AudioUnsupportedSampleRate = 12,
         AudioUnsupportedSpeakerLayout = 13,
         AudioAlreadyConfigured = 14,
@@ -120,6 +120,8 @@ namespace Castor.Engine.Interop
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial byte IsVideoConfigured();
 
+        [LibraryImport(
+            LibraryName,
             EntryPoint = "castor_engine_configure_audio")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial NativeEngineResult ConfigureAudio(
@@ -137,7 +139,7 @@ namespace Castor.Engine.Interop
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial byte GetAudioConfig(
             ref NativeEngineAudioConfiguration configuration);
-      
+
         [LibraryImport(
             LibraryName,
             EntryPoint = "castor_engine_create_main_scene")]
