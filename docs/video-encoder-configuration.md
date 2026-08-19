@@ -1,4 +1,4 @@
-# Video Encoder Configuration
+# Video and Audio Encoder Configuration
 
 Castor Engine creates and configures the video encoder only after the video
 subsystem has been configured (see [OBS Video Configuration](video-configuration.md)).
@@ -84,9 +84,12 @@ castor_engine_result_t result = castor_engine_validate_video_encoder_config(&con
   the encoder apply its own default.
 - `preset`, `profile`: encoder-specific setting names. Empty leaves the
   encoder's own default in place.
-- `audio_bitrate`, `audio_track_index`: reserved for the audio encoder
-  introduced in a follow-up feature. Validated only for shape in this
-  contract and have no effect on the video encoder.
+- `audio_bitrate`, `audio_track_index`: used by the audio encoder (see
+  below), not the video encoder. They are part of this struct because it is
+  shared between both encoders, but `castor_engine_validate_video_encoder_config`
+  and `castor_engine_configure_video_encoder` ignore them entirely - only
+  `castor_engine_validate_audio_encoder_config`/
+  `castor_engine_configure_audio_encoder` read and validate them.
 
 ### Validation
 
@@ -185,4 +188,81 @@ configuration fell back, and an empty string otherwise.
   returns `CASTOR_ENGINE_VIDEO_ENCODER_CREATION_FAILED`.
 - `castor_engine_shutdown` releases the video encoder before OBS itself
   shuts down and clears the engine's video encoder state, so the full
+  initialize/configure/shutdown lifecycle can run again.
+
+## Audio Encoder
+
+Castor Engine creates and binds the AAC audio encoder independently of the
+video encoder: configuring one never requires or implies the other. It only
+requires the OBS audio subsystem (see [Audio Configuration](audio-configuration.md))
+to already be configured.
+
+```csharp
+EngineRuntime.Initialize(
+    new EngineRuntimeConfiguration(AppContext.BaseDirectory));
+
+EngineRuntime.ConfigureAudio(
+    new EngineAudioConfiguration(48000, EngineSpeakerLayout.Stereo));
+
+EngineRuntime.ConfigureAudioEncoder(audioBitrate: 128, audioTrackIndex: 0);
+
+bool isConfigured = EngineRuntime.IsAudioEncoderConfigured;
+EngineVideoEncoderInfo selected = EngineRuntime.GetSelectedAudioEncoder();
+```
+
+`EngineRuntime.ConfigureAudioEncoder`, `IsAudioEncoderConfigured`, and
+`GetSelectedAudioEncoder` mirror `castor_engine_configure_audio_encoder`,
+`castor_engine_is_audio_encoder_configured`, and
+`castor_engine_get_selected_audio_encoder` respectively. `GetSelectedAudioEncoder`
+reuses `EngineVideoEncoderInfo` rather than a dedicated type; its
+`IsHardware` is always `false`, since OBS has no hardware AAC encoder in
+this codebase's supported configurations.
+
+### Native contract and validation
+
+`castor_engine_validate_audio_encoder_config` and
+`castor_engine_configure_audio_encoder` take the same
+`castor_engine_video_encoder_config_t` used by the video encoder, but read
+and validate only `audio_bitrate` and `audio_track_index`:
+
+```c
+castor_engine_video_encoder_config_t config = {0};
+config.struct_size = sizeof(config);
+config.audio_bitrate = 128;
+config.audio_track_index = 0;
+
+castor_engine_result_t result = castor_engine_validate_audio_encoder_config(&config);
+```
+
+Validation rejects a null pointer or undersized `struct_size` (both
+`CASTOR_ENGINE_INVALID_ARGUMENT`), a zero `audio_bitrate`
+(`CASTOR_ENGINE_INVALID_ARGUMENT`), and an `audio_track_index` of
+`MAX_AUDIO_MIXES` (`6`) or greater (`CASTOR_ENGINE_INVALID_ARGUMENT`) - this
+bound is a fixed OBS constant, independent of the live audio configuration.
+
+### Selection, creation, and binding
+
+`castor_engine_configure_audio_encoder` finds the AAC encoder id through
+`obs_get_encoder_codec` (never a hardcoded id such as `"ffmpeg_aac"`),
+creates it through `obs_audio_encoder_create` with `audio_bitrate` applied
+through `obs_data_t`, using `audio_track_index` as the OBS mixer index, and
+binds it to the audio pipeline via `obs_encoder_set_audio`.
+
+#### Lifecycle rules
+
+- Configuring before the engine is initialized returns
+  `CASTOR_ENGINE_NOT_INITIALIZED`.
+- Configuring before the audio subsystem is configured returns
+  `CASTOR_ENGINE_AUDIO_NOT_CONFIGURED`.
+- Repeating the same effective configuration is a no-op that returns
+  `CASTOR_ENGINE_OK`.
+- Requesting different settings while already configured is rejected with
+  `CASTOR_ENGINE_AUDIO_ENCODER_ALREADY_CONFIGURED`, since no output exists
+  yet to make a more permissive rule meaningful - shut down the engine to
+  change the audio encoder configuration.
+- If no AAC encoder is registered, `castor_engine_configure_audio_encoder`
+  returns `CASTOR_ENGINE_AUDIO_ENCODER_UNAVAILABLE`; if OBS fails to create
+  it, it returns `CASTOR_ENGINE_AUDIO_ENCODER_CREATION_FAILED`.
+- `castor_engine_shutdown` releases the audio encoder before OBS itself
+  shuts down and clears the engine's audio encoder state, so the full
   initialize/configure/shutdown lifecycle can run again.
