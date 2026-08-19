@@ -7,6 +7,7 @@
 #include "video_configuration.h"
 #include "video_encoder_configuration.h"
 #include "video_encoder_enumeration.h"
+#include "video_encoder_subsystem.h"
 
 #include <filesystem>
 #include <mutex>
@@ -24,6 +25,7 @@ thread_local std::string last_error;
 
 castor::engine::detail::video_subsystem video;
 castor::engine::detail::audio_subsystem audio;
+castor::engine::detail::video_encoder_subsystem video_encoder;
 castor::engine::detail::obs_scene_backend scene_backend;
 castor::engine::detail::main_scene_subsystem main_scene(scene_backend);
 
@@ -124,6 +126,7 @@ void rollback_startup(bool started_here)
 {
     modules_loaded = false;
     main_scene.reset();
+    video_encoder.reset();
     video.reset();
     audio.reset();
     unregister_libobs_data_path();
@@ -467,6 +470,90 @@ castor_engine_result_t castor_engine_validate_video_encoder_config(const castor_
     return result.code;
 }
 
+castor_engine_result_t castor_engine_configure_video_encoder(const castor_engine_video_encoder_config_t* config)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    castor::engine::detail::video_encoder_lifecycle_result result =
+        video_encoder.configure(config, obs_initialized() && modules_loaded, video.is_configured());
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+uint8_t castor_engine_is_video_encoder_configured(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return video_encoder.is_configured() ? 1U : 0U;
+}
+
+uint8_t castor_engine_get_video_encoder_config(castor_engine_video_encoder_config_t* out_config)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (out_config == nullptr)
+    {
+        set_last_error("The output video encoder configuration pointer must not be null.");
+        return 0U;
+    }
+
+    if (out_config->struct_size < sizeof(castor_engine_video_encoder_config_t))
+    {
+        set_last_error("The output video encoder configuration structure is too small. Expected at least " +
+                       std::to_string(sizeof(castor_engine_video_encoder_config_t)) + " bytes, received " +
+                       std::to_string(out_config->struct_size) + ".");
+        return 0U;
+    }
+
+    if (!video_encoder.get_effective_config(out_config))
+    {
+        set_last_error("The video encoder is not configured.");
+        return 0U;
+    }
+
+    return 1U;
+}
+
+uint8_t castor_engine_get_selected_video_encoder(castor_engine_video_encoder_info_t* out_info)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (out_info == nullptr)
+    {
+        set_last_error("The output video encoder info pointer must not be null.");
+        return 0U;
+    }
+
+    if (out_info->struct_size < sizeof(castor_engine_video_encoder_info_t))
+    {
+        set_last_error("The output video encoder info structure is too small. Expected at least " +
+                       std::to_string(sizeof(castor_engine_video_encoder_info_t)) + " bytes, received " +
+                       std::to_string(out_info->struct_size) + ".");
+        return 0U;
+    }
+
+    if (!video_encoder.get_selected_encoder_info(out_info))
+    {
+        set_last_error("The video encoder is not configured.");
+        return 0U;
+    }
+
+    return 1U;
+}
+
+const char* castor_engine_get_video_encoder_fallback_notice(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return video_encoder.get_fallback_notice();
+}
+
 castor_engine_result_t castor_engine_create_main_scene(void)
 {
     std::scoped_lock lock(lifecycle_mutex);
@@ -520,6 +607,7 @@ void castor_engine_shutdown(void)
     std::scoped_lock lock(lifecycle_mutex);
 
     main_scene.reset();
+    video_encoder.reset();
     video.reset();
 
     if (obs_initialized())
