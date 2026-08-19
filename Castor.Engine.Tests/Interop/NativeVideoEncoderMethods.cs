@@ -79,6 +79,24 @@ namespace Castor.Engine.Tests.Interop
 
         [DllImport(
             LibraryName,
+            EntryPoint = "castor_engine_get_video_encoder_count",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern uint GetVideoEncoderCount();
+
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_video_encoder_at",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte GetVideoEncoderAt(uint index, ref NativeVideoEncoderInfo info);
+
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_video_encoder_at",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte GetVideoEncoderAtRaw(uint index, nint info);
+
+        [DllImport(
+            LibraryName,
             EntryPoint = "castor_engine_validate_video_encoder_config",
             CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeVideoEncoderResult ValidateVideoEncoderConfig(in NativeVideoEncoderConfig config);
@@ -135,6 +153,16 @@ namespace Castor.Engine.Tests.Interop
 
             Array.Copy(encoded, buffer, encoded.Length);
             return buffer;
+        }
+
+        internal static NativeVideoEncoderInfo CreateInfo()
+        {
+            return new NativeVideoEncoderInfo
+            {
+                StructSize = checked((uint)Marshal.SizeOf<NativeVideoEncoderInfo>()),
+                Id = new byte[64],
+                Name = new byte[128],
+            };
         }
 
         internal static string FromFixedBuffer(byte[] buffer)
