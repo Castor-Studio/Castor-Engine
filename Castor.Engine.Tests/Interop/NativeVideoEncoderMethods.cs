@@ -171,6 +171,18 @@ namespace Castor.Engine.Tests.Interop
             CallingConvention = CallingConvention.Cdecl)]
         internal static extern byte GetSelectedAudioEncoder(ref NativeVideoEncoderInfo info);
 
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_video_encoder_handle",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern nint GetVideoEncoderHandle();
+
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_audio_encoder_handle",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern nint GetAudioEncoderHandle();
+
         internal static string? GetLastErrorMessage()
         {
             var pointer = GetLastError();
