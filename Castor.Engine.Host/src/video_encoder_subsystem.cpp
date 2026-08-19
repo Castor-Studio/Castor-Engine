@@ -297,6 +297,11 @@ const char* video_encoder_subsystem::get_fallback_notice() const noexcept
     return fallback_notice_.c_str();
 }
 
+void* video_encoder_subsystem::get_native_encoder() const noexcept
+{
+    return configured_ ? encoder_ : nullptr;
+}
+
 void video_encoder_subsystem::reset() noexcept
 {
     if (encoder_ != nullptr)

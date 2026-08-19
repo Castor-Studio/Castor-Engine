@@ -623,6 +623,18 @@ uint8_t castor_engine_get_selected_audio_encoder(castor_engine_video_encoder_inf
     return 1U;
 }
 
+void* castor_engine_get_video_encoder_handle(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return video_encoder.get_native_encoder();
+}
+
+void* castor_engine_get_audio_encoder_handle(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return audio_encoder.get_native_encoder();
+}
+
 castor_engine_result_t castor_engine_create_main_scene(void)
 {
     std::scoped_lock lock(lifecycle_mutex);

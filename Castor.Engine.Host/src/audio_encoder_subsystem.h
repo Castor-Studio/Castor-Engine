@@ -22,6 +22,10 @@ class audio_encoder_subsystem final
 
     bool get_selected_encoder_info(castor_engine_video_encoder_info_t* out_info);
 
+    // Opaque, non-owning obs_encoder_t* for a future output implementation
+    // to bind via obs_output_set_audio_encoder. nullptr when not configured.
+    void* get_native_encoder() const noexcept;
+
     void reset() noexcept;
 
   private:

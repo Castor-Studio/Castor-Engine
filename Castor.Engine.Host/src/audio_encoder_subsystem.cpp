@@ -143,6 +143,11 @@ bool audio_encoder_subsystem::get_selected_encoder_info(castor_engine_video_enco
     return true;
 }
 
+void* audio_encoder_subsystem::get_native_encoder() const noexcept
+{
+    return configured_ ? encoder_ : nullptr;
+}
+
 void audio_encoder_subsystem::reset() noexcept
 {
     if (encoder_ != nullptr)

@@ -26,6 +26,10 @@ class video_encoder_subsystem final
 
     const char* get_fallback_notice() const noexcept;
 
+    // Opaque, non-owning obs_encoder_t* for a future output implementation
+    // to bind via obs_output_set_video_encoder. nullptr when not configured.
+    void* get_native_encoder() const noexcept;
+
     void reset() noexcept;
 
   private:

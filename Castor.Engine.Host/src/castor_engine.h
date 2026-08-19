@@ -299,6 +299,34 @@ extern "C"
     CASTOR_ENGINE_API uint8_t
     castor_engine_get_selected_audio_encoder(castor_engine_video_encoder_info_t* out_info);
 
+    /**
+     * Retrieves an opaque, engine-owned handle to the configured video
+     * encoder, for a native output implementation to bind (e.g. through
+     * obs_output_set_video_encoder). Never a struct or a documented OBS
+     * type - callers must not interpret or dereference it themselves.
+     *
+     * The handle is non-owning: the engine still owns and releases the
+     * encoder. The same handle may be retrieved and attached to more than
+     * one output. Returns NULL when the video encoder is not configured.
+     *
+     * The handle becomes invalid when the engine shuts down or the video
+     * encoder is reconfigured. The engine does not track which outputs
+     * hold an outstanding handle, so any output using one must stop and
+     * release itself before engine shutdown reaches the point where the
+     * encoder itself is released.
+     */
+    CASTOR_ENGINE_API void* castor_engine_get_video_encoder_handle(void);
+
+    /**
+     * Retrieves an opaque, engine-owned handle to the configured audio
+     * encoder, for a native output implementation to bind (e.g. through
+     * obs_output_set_audio_encoder). Same contract as
+     * castor_engine_get_video_encoder_handle: non-owning, attachable to
+     * more than one output, invalid after shutdown or reconfiguration, and
+     * NULL when the audio encoder is not configured.
+     */
+    CASTOR_ENGINE_API void* castor_engine_get_audio_encoder_handle(void);
+
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_create_main_scene(void);
 
     CASTOR_ENGINE_API uint8_t castor_engine_has_active_scene(void);
