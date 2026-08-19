@@ -87,9 +87,25 @@ std::optional<castor_engine_video_encoder_info_t> find_first_hardware_h264(
     return std::nullopt;
 }
 
+// Some hardware encoder plugins (e.g. obs-qsv11) also register their own
+// software fallback encoder id, which would otherwise tie with the
+// packaged x264 encoder as "a software H.264 encoder" depending on module
+// load order. The issue this feature implements names x264 specifically
+// as the software encoder, so prefer it by id - still verified against
+// the live enumeration rather than assumed - and only fall back to
+// whichever other software H.264 encoder is available if x264 is somehow
+// not registered.
 std::optional<castor_engine_video_encoder_info_t> find_software_h264(
     const std::vector<castor_engine_video_encoder_info_t>& infos)
 {
+    constexpr const char* preferred_software_encoder_id = "obs_x264";
+
+    if (std::optional<castor_engine_video_encoder_info_t> preferred = find_by_id(infos, preferred_software_encoder_id);
+        preferred.has_value() && preferred->is_hardware == 0 && preferred->is_available != 0)
+    {
+        return preferred;
+    }
+
     for (const auto& info : infos)
     {
         if (info.is_hardware == 0 && is_h264(info.id))
