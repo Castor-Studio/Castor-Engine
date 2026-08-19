@@ -103,6 +103,36 @@ namespace Castor.Engine.Tests.Interop
 
         [DllImport(
             LibraryName,
+            EntryPoint = "castor_engine_configure_video_encoder",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern NativeVideoEncoderResult ConfigureVideoEncoder(in NativeVideoEncoderConfig config);
+
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_is_video_encoder_configured",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte IsVideoEncoderConfigured();
+
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_video_encoder_config",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte GetVideoEncoderConfig(ref NativeVideoEncoderConfig config);
+
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_selected_video_encoder",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte GetSelectedVideoEncoder(ref NativeVideoEncoderInfo info);
+
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_video_encoder_fallback_notice",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern nint GetVideoEncoderFallbackNotice();
+
+        [DllImport(
+            LibraryName,
             EntryPoint = "castor_engine_validate_video_encoder_config",
             CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeVideoEncoderResult ValidateVideoEncoderConfigRaw(nint config);
@@ -111,6 +141,12 @@ namespace Castor.Engine.Tests.Interop
         {
             var pointer = GetLastError();
             return pointer == nint.Zero ? null : Marshal.PtrToStringUTF8(pointer);
+        }
+
+        internal static string GetVideoEncoderFallbackNoticeMessage()
+        {
+            var pointer = GetVideoEncoderFallbackNotice();
+            return pointer == nint.Zero ? string.Empty : Marshal.PtrToStringUTF8(pointer) ?? string.Empty;
         }
 
         internal static NativeVideoEncoderConfig CreateConfig(
