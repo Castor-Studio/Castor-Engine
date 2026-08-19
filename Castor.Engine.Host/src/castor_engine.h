@@ -57,6 +57,11 @@ extern "C"
         CASTOR_ENGINE_VIDEO_ENCODER_UNAVAILABLE = 22,
         CASTOR_ENGINE_VIDEO_ENCODER_ALREADY_CONFIGURED = 23,
         CASTOR_ENGINE_VIDEO_ENCODER_CREATION_FAILED = 24,
+
+        CASTOR_ENGINE_AUDIO_NOT_CONFIGURED = 25,
+        CASTOR_ENGINE_AUDIO_ENCODER_ALREADY_CONFIGURED = 26,
+        CASTOR_ENGINE_AUDIO_ENCODER_UNAVAILABLE = 27,
+        CASTOR_ENGINE_AUDIO_ENCODER_CREATION_FAILED = 28,
     } castor_engine_result_t;
 
     typedef enum castor_engine_speaker_layout
@@ -257,6 +262,42 @@ extern "C"
      * string when the current configuration did not fall back.
      */
     CASTOR_ENGINE_API const char* castor_engine_get_video_encoder_fallback_notice(void);
+
+    /**
+     * Validates the audio_bitrate and audio_track_index fields of a video
+     * encoder configuration in isolation, for use with
+     * castor_engine_configure_audio_encoder. This does not require the
+     * engine, OBS, or the audio subsystem to be initialized, and does not
+     * inspect any other field in the configuration.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_validate_audio_encoder_config(const castor_engine_video_encoder_config_t* config);
+
+    /**
+     * Creates the AAC audio encoder from audio_bitrate and binds it to the
+     * OBS audio pipeline on the mixer identified by audio_track_index.
+     * Requires the OBS audio subsystem (see castor_engine_configure_audio)
+     * to already be configured. Independent of the video encoder: neither
+     * requires the other to be configured first.
+     *
+     * Repeating the same effective configuration is a no-op. Requesting
+     * different settings while the audio encoder is already created is
+     * rejected with CASTOR_ENGINE_AUDIO_ENCODER_ALREADY_CONFIGURED; shut
+     * down the engine first to apply a different configuration.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_configure_audio_encoder(const castor_engine_video_encoder_config_t* config);
+
+    CASTOR_ENGINE_API uint8_t castor_engine_is_audio_encoder_configured(void);
+
+    /**
+     * Retrieves metadata for the audio encoder actually selected by the
+     * last successful castor_engine_configure_audio_encoder call.
+     * is_hardware is always 0. Returns 0 when no audio encoder is
+     * configured.
+     */
+    CASTOR_ENGINE_API uint8_t
+    castor_engine_get_selected_audio_encoder(castor_engine_video_encoder_info_t* out_info);
 
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_create_main_scene(void);
 
