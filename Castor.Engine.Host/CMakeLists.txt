@@ -9,6 +9,7 @@ add_library(Castor.Engine.Host SHARED
     src/video_encoder_enumeration.cpp
     src/video_encoder_subsystem.cpp
     src/audio_encoder_configuration.cpp
+    src/audio_encoder_subsystem.cpp
 )
 
 target_include_directories(
