@@ -6,6 +6,7 @@
 #include "obs_scene_backend.h"
 #include "video_configuration.h"
 #include "video_encoder_configuration.h"
+#include "video_encoder_enumeration.h"
 
 #include <filesystem>
 #include <mutex>
@@ -399,6 +400,52 @@ uint8_t castor_engine_get_audio_config(castor_engine_audio_config_t* out_config)
     if (!audio.get_effective_config(out_config))
     {
         set_last_error("The audio subsystem is not configured.");
+        return 0U;
+    }
+
+    return 1U;
+}
+
+uint32_t castor_engine_get_video_encoder_count(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+
+    if (!obs_initialized() || !modules_loaded)
+    {
+        return 0;
+    }
+
+    return castor::engine::detail::get_video_encoder_count();
+}
+
+uint8_t castor_engine_get_video_encoder_at(uint32_t index, castor_engine_video_encoder_info_t* out_info)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (out_info == nullptr)
+    {
+        set_last_error("The output video encoder info pointer must not be null.");
+        return 0U;
+    }
+
+    if (out_info->struct_size < sizeof(castor_engine_video_encoder_info_t))
+    {
+        set_last_error("The output video encoder info structure is too small. Expected at least " +
+                       std::to_string(sizeof(castor_engine_video_encoder_info_t)) + " bytes, received " +
+                       std::to_string(out_info->struct_size) + ".");
+        return 0U;
+    }
+
+    if (!obs_initialized() || !modules_loaded)
+    {
+        set_last_error("The engine must be initialized before video encoders can be enumerated.");
+        return 0U;
+    }
+
+    if (!castor::engine::detail::get_video_encoder_at(index, *out_info))
+    {
+        set_last_error("No video encoder exists at index " + std::to_string(index) + ".");
         return 0U;
     }
 
