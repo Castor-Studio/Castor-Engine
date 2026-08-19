@@ -29,6 +29,11 @@ namespace Castor.Engine.Interop
         SceneSourceCreationFailed = 18,
         SceneSourceAddFailed = 19,
         SceneActivationFailed = 20,
+
+        VideoEncoderUnknownId = 21,
+        VideoEncoderUnavailable = 22,
+        VideoEncoderAlreadyConfigured = 23,
+        VideoEncoderCreationFailed = 24,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -57,6 +62,31 @@ namespace Castor.Engine.Interop
         internal uint StructSize;
         internal uint SampleRate;
         internal uint SpeakerLayout;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineVideoEncoderConfiguration
+    {
+        internal uint StructSize;
+        internal uint SelectionMode;
+        internal FixedBuffer64 EncoderId;
+        internal uint Bitrate;
+        internal uint RateControl;
+        internal uint KeyframeIntervalSeconds;
+        internal FixedBuffer32 Preset;
+        internal FixedBuffer32 Profile;
+        internal uint AudioBitrate;
+        internal uint AudioTrackIndex;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineVideoEncoderInfo
+    {
+        internal uint StructSize;
+        internal FixedBuffer64 Id;
+        internal FixedBuffer128 Name;
+        internal byte IsHardware;
+        internal byte IsAvailable;
     }
 
     internal static partial class NativeMethods
@@ -139,6 +169,60 @@ namespace Castor.Engine.Interop
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial byte GetAudioConfig(
             ref NativeEngineAudioConfiguration configuration);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_video_encoder_count")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial uint GetVideoEncoderCount();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_video_encoder_at")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte GetVideoEncoderAt(
+            uint index,
+            ref NativeEngineVideoEncoderInfo info);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_validate_video_encoder_config")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult ValidateVideoEncoderConfig(
+            in NativeEngineVideoEncoderConfiguration configuration);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_configure_video_encoder")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult ConfigureVideoEncoder(
+            in NativeEngineVideoEncoderConfiguration configuration);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_is_video_encoder_configured")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte IsVideoEncoderConfigured();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_video_encoder_config")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte GetVideoEncoderConfig(
+            ref NativeEngineVideoEncoderConfiguration configuration);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_selected_video_encoder")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte GetSelectedVideoEncoder(
+            ref NativeEngineVideoEncoderInfo info);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_video_encoder_fallback_notice")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial nint GetVideoEncoderFallbackNotice();
 
         [LibraryImport(
             LibraryName,

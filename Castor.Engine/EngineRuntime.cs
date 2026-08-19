@@ -226,6 +226,178 @@ namespace Castor.Engine
         }
 
         /// <summary>
+        /// Gets whether the video encoder is created and bound to the video
+        /// pipeline.
+        /// </summary>
+        public static bool IsVideoEncoderConfigured =>
+            NativeMethods.IsVideoEncoderConfigured() != 0;
+
+        /// <summary>
+        /// Gets the diagnostic describing why the video encoder fell back
+        /// from hardware to software on the current configuration, or an
+        /// empty string when it did not fall back.
+        /// </summary>
+        public static string VideoEncoderFallbackNotice
+        {
+            get
+            {
+                var pointer = NativeMethods.GetVideoEncoderFallbackNotice();
+                return pointer == nint.Zero
+                    ? string.Empty
+                    : Marshal.PtrToStringUTF8(pointer) ?? string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Enumerates the video encoders available in the current OBS
+        /// runtime.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the engine is not initialized or enumeration fails.
+        /// </exception>
+        public static IReadOnlyList<EngineVideoEncoderInfo> EnumerateVideoEncoders()
+        {
+            var count = NativeMethods.GetVideoEncoderCount();
+            var encoders = new List<EngineVideoEncoderInfo>((int)count);
+
+            for (uint index = 0; index < count; index++)
+            {
+                var nativeInfo = new NativeEngineVideoEncoderInfo
+                {
+                    StructSize = checked(
+                        (uint)Marshal.SizeOf<NativeEngineVideoEncoderInfo>()),
+                };
+
+                if (NativeMethods.GetVideoEncoderAt(index, ref nativeInfo) == 0)
+                {
+                    throw CreateNativeOperationException("enumerate video encoders");
+                }
+
+                encoders.Add(ToVideoEncoderInfo(nativeInfo));
+            }
+
+            return encoders;
+        }
+
+        /// <summary>
+        /// Selects, creates, and binds the video encoder to the OBS video
+        /// pipeline. Requires the video subsystem to already be configured.
+        /// </summary>
+        /// <param name="configuration">
+        /// The video encoder selection and settings.
+        /// </param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown when <paramref name="configuration"/> is null.
+        /// </exception>
+        /// <exception cref="NotSupportedException">
+        /// Thrown when the native and managed ABI versions are incompatible.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the engine or video subsystem is not initialized,
+        /// the requested configuration or encoder identifier is invalid,
+        /// the video encoder is already configured with different settings,
+        /// or OBS cannot create or bind the encoder. A hardware-preferred
+        /// or automatic selection that falls back to software never fails
+        /// silently: check <see cref="VideoEncoderFallbackNotice"/> after a
+        /// successful call.
+        /// </exception>
+        public static void ConfigureVideoEncoder(
+            EngineVideoEncoderConfiguration configuration)
+        {
+            ArgumentNullException.ThrowIfNull(configuration);
+            EngineInfo.ValidateCompatibility();
+
+            var nativeConfiguration = new NativeEngineVideoEncoderConfiguration
+            {
+                StructSize = checked(
+                    (uint)Marshal.SizeOf<NativeEngineVideoEncoderConfiguration>()),
+                SelectionMode = (uint)configuration.SelectionMode,
+                Bitrate = configuration.Bitrate,
+                RateControl = (uint)configuration.RateControl,
+                KeyframeIntervalSeconds = configuration.KeyframeIntervalSeconds,
+                AudioBitrate = configuration.AudioBitrate,
+                AudioTrackIndex = configuration.AudioTrackIndex,
+            };
+            FixedBufferInterop.Encode(configuration.EncoderId, nativeConfiguration.EncoderId);
+            FixedBufferInterop.Encode(configuration.Preset, nativeConfiguration.Preset);
+            FixedBufferInterop.Encode(configuration.Profile, nativeConfiguration.Profile);
+
+            var result = NativeMethods.ConfigureVideoEncoder(in nativeConfiguration);
+
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException(
+                    "configure the video encoder",
+                    result);
+            }
+        }
+
+        /// <summary>
+        /// Gets the effective video encoder configuration.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the video encoder is not configured.
+        /// </exception>
+        public static EngineVideoEncoderConfiguration GetVideoEncoderConfiguration()
+        {
+            var nativeConfiguration = new NativeEngineVideoEncoderConfiguration
+            {
+                StructSize = checked(
+                    (uint)Marshal.SizeOf<NativeEngineVideoEncoderConfiguration>()),
+            };
+
+            if (NativeMethods.GetVideoEncoderConfig(ref nativeConfiguration) == 0)
+            {
+                throw CreateNativeOperationException(
+                    "retrieve the video encoder configuration");
+            }
+
+            return new EngineVideoEncoderConfiguration(
+                (EngineVideoEncoderSelectionMode)nativeConfiguration.SelectionMode,
+                FixedBufferInterop.Decode(nativeConfiguration.EncoderId),
+                nativeConfiguration.Bitrate,
+                (EngineVideoEncoderRateControl)nativeConfiguration.RateControl,
+                nativeConfiguration.KeyframeIntervalSeconds,
+                FixedBufferInterop.Decode(nativeConfiguration.Preset),
+                FixedBufferInterop.Decode(nativeConfiguration.Profile),
+                nativeConfiguration.AudioBitrate,
+                nativeConfiguration.AudioTrackIndex);
+        }
+
+        /// <summary>
+        /// Gets the video encoder actually selected by the last successful
+        /// <see cref="ConfigureVideoEncoder"/> call.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the video encoder is not configured.
+        /// </exception>
+        public static EngineVideoEncoderInfo GetSelectedVideoEncoder()
+        {
+            var nativeInfo = new NativeEngineVideoEncoderInfo
+            {
+                StructSize = checked(
+                    (uint)Marshal.SizeOf<NativeEngineVideoEncoderInfo>()),
+            };
+
+            if (NativeMethods.GetSelectedVideoEncoder(ref nativeInfo) == 0)
+            {
+                throw CreateNativeOperationException(
+                    "retrieve the selected video encoder");
+            }
+
+            return ToVideoEncoderInfo(nativeInfo);
+        }
+
+        private static EngineVideoEncoderInfo ToVideoEncoderInfo(NativeEngineVideoEncoderInfo nativeInfo)
+        {
+            return new EngineVideoEncoderInfo(
+                FixedBufferInterop.Decode(nativeInfo.Id),
+                FixedBufferInterop.Decode(nativeInfo.Name),
+                nativeInfo.IsHardware != 0,
+                nativeInfo.IsAvailable != 0);
+        }
+
+        /// <summary>
         /// Creates the engine-owned main scene, adds a solid-color source,
         /// and connects it to the primary OBS video output.
         /// </summary>
