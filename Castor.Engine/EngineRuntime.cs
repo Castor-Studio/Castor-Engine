@@ -398,6 +398,80 @@ namespace Castor.Engine
         }
 
         /// <summary>
+        /// Gets whether the audio encoder is created and bound to the
+        /// audio pipeline. Independent of the video encoder: neither
+        /// requires the other to be configured first.
+        /// </summary>
+        public static bool IsAudioEncoderConfigured =>
+            NativeMethods.IsAudioEncoderConfigured() != 0;
+
+        /// <summary>
+        /// Creates the AAC audio encoder and binds it to the OBS audio
+        /// pipeline. Requires the OBS audio subsystem
+        /// (<see cref="ConfigureAudio"/>) to already be configured.
+        /// </summary>
+        /// <param name="audioBitrate">The audio bitrate, in kbps.</param>
+        /// <param name="audioTrackIndex">
+        /// The audio track (OBS mixer) index the encoder binds to.
+        /// </param>
+        /// <exception cref="NotSupportedException">
+        /// Thrown when the native and managed ABI versions are incompatible.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the engine or audio subsystem is not initialized,
+        /// the requested bitrate or track index is invalid, the audio
+        /// encoder is already configured with different settings, or OBS
+        /// cannot create or bind the encoder.
+        /// </exception>
+        public static void ConfigureAudioEncoder(uint audioBitrate, uint audioTrackIndex)
+        {
+            EngineInfo.ValidateCompatibility();
+
+            var nativeConfiguration = new NativeEngineVideoEncoderConfiguration
+            {
+                StructSize = checked(
+                    (uint)Marshal.SizeOf<NativeEngineVideoEncoderConfiguration>()),
+                AudioBitrate = audioBitrate,
+                AudioTrackIndex = audioTrackIndex,
+            };
+
+            var result = NativeMethods.ConfigureAudioEncoder(in nativeConfiguration);
+
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException(
+                    "configure the audio encoder",
+                    result);
+            }
+        }
+
+        /// <summary>
+        /// Gets the audio encoder actually selected by the last successful
+        /// <see cref="ConfigureAudioEncoder"/> call.
+        /// <see cref="EngineVideoEncoderInfo.IsHardware"/> is always
+        /// <see langword="false"/> for it.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the audio encoder is not configured.
+        /// </exception>
+        public static EngineVideoEncoderInfo GetSelectedAudioEncoder()
+        {
+            var nativeInfo = new NativeEngineVideoEncoderInfo
+            {
+                StructSize = checked(
+                    (uint)Marshal.SizeOf<NativeEngineVideoEncoderInfo>()),
+            };
+
+            if (NativeMethods.GetSelectedAudioEncoder(ref nativeInfo) == 0)
+            {
+                throw CreateNativeOperationException(
+                    "retrieve the selected audio encoder");
+            }
+
+            return ToVideoEncoderInfo(nativeInfo);
+        }
+
+        /// <summary>
         /// Creates the engine-owned main scene, adds a solid-color source,
         /// and connects it to the primary OBS video output.
         /// </summary>

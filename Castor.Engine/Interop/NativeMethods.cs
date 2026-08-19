@@ -34,6 +34,11 @@ namespace Castor.Engine.Interop
         VideoEncoderUnavailable = 22,
         VideoEncoderAlreadyConfigured = 23,
         VideoEncoderCreationFailed = 24,
+
+        AudioNotConfigured = 25,
+        AudioEncoderAlreadyConfigured = 26,
+        AudioEncoderUnavailable = 27,
+        AudioEncoderCreationFailed = 28,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -223,6 +228,33 @@ namespace Castor.Engine.Interop
             EntryPoint = "castor_engine_get_video_encoder_fallback_notice")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial nint GetVideoEncoderFallbackNotice();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_validate_audio_encoder_config")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult ValidateAudioEncoderConfig(
+            in NativeEngineVideoEncoderConfiguration configuration);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_configure_audio_encoder")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult ConfigureAudioEncoder(
+            in NativeEngineVideoEncoderConfiguration configuration);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_is_audio_encoder_configured")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte IsAudioEncoderConfigured();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_selected_audio_encoder")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte GetSelectedAudioEncoder(
+            ref NativeEngineVideoEncoderInfo info);
 
         [LibraryImport(
             LibraryName,
