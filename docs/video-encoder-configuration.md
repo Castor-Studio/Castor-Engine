@@ -266,3 +266,50 @@ binds it to the audio pipeline via `obs_encoder_set_audio`.
 - `castor_engine_shutdown` releases the audio encoder before OBS itself
   shuts down and clears the engine's audio encoder state, so the full
   initialize/configure/shutdown lifecycle can run again.
+
+## Encoder Retrieval
+
+`castor_engine_get_video_encoder_handle` and `castor_engine_get_audio_encoder_handle`
+return an opaque, engine-owned handle to the configured video or audio
+encoder, for a native output implementation to bind - for example through
+OBS's `obs_output_set_video_encoder`/`obs_output_set_audio_encoder`. Neither
+function names or exposes `obs_encoder_t`; the handle is typed `void*`
+(`nint` in managed code) and callers must not interpret or dereference it
+themselves.
+
+```c
+void* video_handle = castor_engine_get_video_encoder_handle();
+void* audio_handle = castor_engine_get_audio_encoder_handle();
+```
+
+```csharp
+nint videoHandle = EngineRuntime.GetVideoEncoderHandle();
+nint audioHandle = EngineRuntime.GetAudioEncoderHandle();
+```
+
+Both return `NULL`/`nint.Zero` when the corresponding encoder is not
+configured. There is no managed API to do anything with a retrieved handle
+directly today - it is exposed on the managed side purely so that adding
+output support later does not require another ABI bump just to add
+retrieval.
+
+### Contract for output implementations
+
+- **Non-owning.** The engine still owns and releases the encoder; a caller
+  holding a handle must never release it itself.
+- **Attachable to more than one output.** Retrieval does not consume or vary
+  the handle - repeated calls return the same value, so independent outputs
+  (for example a simultaneous recording and an RTMP stream) can each bind
+  the same encoder.
+- **Invalidated by shutdown or reconfiguration.** The handle becomes invalid
+  when the engine shuts down or the corresponding encoder is reconfigured.
+  The engine does not track which outputs hold an outstanding handle, so
+  any output using one must stop and release itself before engine shutdown
+  reaches the point where the encoder itself is released - the reverse
+  order leaks or crashes.
+
+This retrieval API is the extent of what this codebase currently does with
+encoder handles: no output type exists here yet to consume one. Building an
+actual output (MKV recording, and later RTMP) - including verifying the
+release-ordering contract above against a real `obs_output_t` - is separate,
+tracked work.
