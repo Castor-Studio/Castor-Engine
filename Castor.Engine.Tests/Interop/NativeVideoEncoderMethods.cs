@@ -13,6 +13,10 @@ namespace Castor.Engine.Tests.Interop
         VideoEncoderUnavailable = 22,
         VideoEncoderAlreadyConfigured = 23,
         VideoEncoderCreationFailed = 24,
+        AudioNotConfigured = 25,
+        AudioEncoderAlreadyConfigured = 26,
+        AudioEncoderUnavailable = 27,
+        AudioEncoderCreationFailed = 28,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -137,6 +141,36 @@ namespace Castor.Engine.Tests.Interop
             CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeVideoEncoderResult ValidateVideoEncoderConfigRaw(nint config);
 
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_validate_audio_encoder_config",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern NativeVideoEncoderResult ValidateAudioEncoderConfig(in NativeVideoEncoderConfig config);
+
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_validate_audio_encoder_config",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern NativeVideoEncoderResult ValidateAudioEncoderConfigRaw(nint config);
+
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_configure_audio_encoder",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern NativeVideoEncoderResult ConfigureAudioEncoder(in NativeVideoEncoderConfig config);
+
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_is_audio_encoder_configured",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte IsAudioEncoderConfigured();
+
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_selected_audio_encoder",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern byte GetSelectedAudioEncoder(ref NativeVideoEncoderInfo info);
+
         internal static string? GetLastErrorMessage()
         {
             var pointer = GetLastError();
@@ -173,6 +207,13 @@ namespace Castor.Engine.Tests.Interop
                 AudioBitrate = audioBitrate,
                 AudioTrackIndex = audioTrackIndex,
             };
+        }
+
+        internal static NativeVideoEncoderConfig CreateAudioEncoderConfig(
+            uint audioBitrate = 128,
+            uint audioTrackIndex = 0)
+        {
+            return CreateConfig(audioBitrate: audioBitrate, audioTrackIndex: audioTrackIndex);
         }
 
         internal static byte[] ToFixedBuffer(string value, int size)
