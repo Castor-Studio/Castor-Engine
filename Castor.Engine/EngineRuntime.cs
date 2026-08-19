@@ -472,6 +472,38 @@ namespace Castor.Engine
         }
 
         /// <summary>
+        /// Gets an opaque, engine-owned handle to the configured video
+        /// encoder, for a future native output feature to bind. There is
+        /// no managed API to do anything with this value directly; it is
+        /// exposed now so that adding output support later does not
+        /// require another ABI bump just to add retrieval.
+        /// </summary>
+        /// <returns>
+        /// A non-zero, opaque handle, or <see cref="nint.Zero"/> when the
+        /// video encoder is not configured. The handle becomes invalid
+        /// when the engine shuts down or the video encoder is
+        /// reconfigured.
+        /// </returns>
+        public static nint GetVideoEncoderHandle()
+        {
+            return NativeMethods.GetVideoEncoderHandle();
+        }
+
+        /// <summary>
+        /// Gets an opaque, engine-owned handle to the configured audio
+        /// encoder, for a future native output feature to bind. Same
+        /// contract as <see cref="GetVideoEncoderHandle"/>.
+        /// </summary>
+        /// <returns>
+        /// A non-zero, opaque handle, or <see cref="nint.Zero"/> when the
+        /// audio encoder is not configured.
+        /// </returns>
+        public static nint GetAudioEncoderHandle()
+        {
+            return NativeMethods.GetAudioEncoderHandle();
+        }
+
+        /// <summary>
         /// Creates the engine-owned main scene, adds a solid-color source,
         /// and connects it to the primary OBS video output.
         /// </summary>

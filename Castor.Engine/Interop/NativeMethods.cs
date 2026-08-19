@@ -258,6 +258,18 @@ namespace Castor.Engine.Interop
 
         [LibraryImport(
             LibraryName,
+            EntryPoint = "castor_engine_get_video_encoder_handle")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial nint GetVideoEncoderHandle();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_audio_encoder_handle")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial nint GetAudioEncoderHandle();
+
+        [LibraryImport(
+            LibraryName,
             EntryPoint = "castor_engine_create_main_scene")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial NativeEngineResult CreateMainScene();
