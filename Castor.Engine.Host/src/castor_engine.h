@@ -62,6 +62,15 @@ extern "C"
         CASTOR_ENGINE_AUDIO_ENCODER_ALREADY_CONFIGURED = 26,
         CASTOR_ENGINE_AUDIO_ENCODER_UNAVAILABLE = 27,
         CASTOR_ENGINE_AUDIO_ENCODER_CREATION_FAILED = 28,
+
+        CASTOR_ENGINE_RECORDING_NO_ACTIVE_SCENE = 29,
+        CASTOR_ENGINE_RECORDING_HARDWARE_ENCODER_NOT_ALLOWED = 30,
+        CASTOR_ENGINE_RECORDING_ALREADY_ACTIVE = 31,
+        CASTOR_ENGINE_RECORDING_NOT_ACTIVE = 32,
+        CASTOR_ENGINE_RECORDING_INVALID_DESTINATION = 33,
+        CASTOR_ENGINE_RECORDING_OUTPUT_UNAVAILABLE = 34,
+        CASTOR_ENGINE_RECORDING_OUTPUT_CREATION_FAILED = 35,
+        CASTOR_ENGINE_RECORDING_START_FAILED = 36,
     } castor_engine_result_t;
 
     typedef enum castor_engine_speaker_layout
@@ -326,6 +335,54 @@ extern "C"
      * NULL when the audio encoder is not configured.
      */
     CASTOR_ENGINE_API void* castor_engine_get_audio_encoder_handle(void);
+
+    /**
+     * A versioned description of an MKV recording destination. If
+     * destination_path already exists, it is overwritten - Castor Engine
+     * does not perform its own existence check or provide a no-overwrite
+     * mode.
+     */
+    typedef struct castor_engine_recording_config
+    {
+        uint32_t struct_size;
+        const char* destination_path;
+    } castor_engine_recording_config_t;
+
+    /**
+     * Validates a recording configuration in isolation. This does not
+     * require the engine or OBS to be initialized and does not start a
+     * recording.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_validate_recording_config(const castor_engine_recording_config_t* config);
+
+    /**
+     * Starts recording the active main scene to destination_path as an
+     * MKV file, encoded with the video encoder.
+     *
+     * If no video encoder is configured yet, one is created automatically
+     * in forced-software mode with deterministic baseline settings. If a
+     * video encoder is already configured, it must be a software encoder
+     * - a configured hardware encoder is rejected with
+     * CASTOR_ENGINE_RECORDING_HARDWARE_ENCODER_NOT_ALLOWED, since this
+     * recording path never uses a hardware encoder, silently or
+     * otherwise.
+     *
+     * Requires the engine to be initialized, the video subsystem to be
+     * configured, and the main scene to be active. Starting while already
+     * recording is rejected with CASTOR_ENGINE_RECORDING_ALREADY_ACTIVE.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_start_recording(const castor_engine_recording_config_t* config);
+
+    /**
+     * Stops the active recording and blocks until OBS has finalized the
+     * MKV container before returning. Returns
+     * CASTOR_ENGINE_RECORDING_NOT_ACTIVE when no recording is active.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_stop_recording(void);
+
+    CASTOR_ENGINE_API uint8_t castor_engine_is_recording_active(void);
 
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_create_main_scene(void);
 

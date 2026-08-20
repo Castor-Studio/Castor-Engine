@@ -6,6 +6,7 @@
 #include "audio_subsystem.h"
 #include "main_scene.h"
 #include "obs_scene_backend.h"
+#include "recording_configuration.h"
 #include "video_configuration.h"
 #include "video_encoder_configuration.h"
 #include "video_encoder_enumeration.h"
@@ -633,6 +634,21 @@ void* castor_engine_get_audio_encoder_handle(void)
 {
     std::scoped_lock lock(lifecycle_mutex);
     return audio_encoder.get_native_encoder();
+}
+
+castor_engine_result_t castor_engine_validate_recording_config(const castor_engine_recording_config_t* config)
+{
+    last_error.clear();
+
+    castor::engine::detail::recording_configuration_result result =
+        castor::engine::detail::validate_recording_config(config);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
 }
 
 castor_engine_result_t castor_engine_create_main_scene(void)
