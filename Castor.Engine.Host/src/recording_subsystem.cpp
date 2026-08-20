@@ -43,7 +43,7 @@ void handle_stop_signal(void* data, calldata_t*)
 
 recording_lifecycle_result recording_subsystem::start(const castor_engine_recording_config_t* config,
                                                         bool runtime_ready, bool video_ready, bool scene_active,
-                                                        void* video_encoder_handle)
+                                                        void* video_encoder_handle, void* audio_encoder_handle)
 {
     const recording_configuration_result validation_result = validate_recording_config(config);
 
@@ -109,6 +109,7 @@ recording_lifecycle_result recording_subsystem::start(const castor_engine_record
     }
 
     obs_output_set_video_encoder(output, static_cast<obs_encoder_t*>(video_encoder_handle));
+    obs_output_set_audio_encoder(output, static_cast<obs_encoder_t*>(audio_encoder_handle), 0);
 
     if (!obs_output_start(output))
     {

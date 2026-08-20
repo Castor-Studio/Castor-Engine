@@ -704,11 +704,58 @@ castor_engine_result_t castor_engine_start_recording(const castor_engine_recordi
         }
     }
 
+    // OBS's ffmpeg_muxer output (the one this feature uses, and the one
+    // named explicitly in this issue) refuses to start without an audio
+    // encoder bound, even for a video-only recording - obs_output_start
+    // fails immediately, with no error text, for an encoded AV-capable
+    // output missing its audio encoder. obs_output_set_mixers cannot work
+    // around this either ("Tried to use obs_output_set_mixers on an
+    // encoded output" is rejected by OBS itself). So recording always
+    // auto-configures the audio subsystem and the AAC audio encoder too,
+    // the same way it already does for the video encoder, rather than
+    // leaving recording permanently broken.
+    bool audio_ready = runtime_ready && audio.is_configured();
+
+    if (runtime_ready && !audio_ready)
+    {
+        castor_engine_audio_config_t default_audio_config{};
+        default_audio_config.struct_size = sizeof(default_audio_config);
+
+        castor::engine::detail::audio_lifecycle_result audio_result =
+            audio.configure(&default_audio_config, runtime_ready);
+
+        if (audio_result.code != CASTOR_ENGINE_OK)
+        {
+            set_last_error(std::move(audio_result.message));
+            return audio_result.code;
+        }
+
+        audio_ready = true;
+    }
+
+    if (runtime_ready && audio_ready && !audio_encoder.is_configured())
+    {
+        castor_engine_video_encoder_config_t default_audio_encoder_config{};
+        default_audio_encoder_config.struct_size = sizeof(default_audio_encoder_config);
+        default_audio_encoder_config.audio_bitrate = 128;
+        default_audio_encoder_config.audio_track_index = 0;
+
+        castor::engine::detail::audio_encoder_lifecycle_result audio_encoder_result =
+            audio_encoder.configure(&default_audio_encoder_config, runtime_ready, audio_ready);
+
+        if (audio_encoder_result.code != CASTOR_ENGINE_OK)
+        {
+            set_last_error(std::move(audio_encoder_result.message));
+            return audio_encoder_result.code;
+        }
+    }
+
     const bool scene_active = runtime_ready && main_scene.is_active();
     void* video_encoder_handle = video_encoder.get_native_encoder();
+    void* audio_encoder_handle = audio_encoder.get_native_encoder();
 
-    castor::engine::detail::recording_lifecycle_result result =
-        recording.start(config, runtime_ready, video_ready, scene_active, video_encoder_handle);
+    castor::engine::detail::recording_lifecycle_result result = recording.start(
+        config, runtime_ready, video_ready, scene_active, video_encoder_handle, audio_encoder_handle);
 
     if (result.code != CASTOR_ENGINE_OK)
     {
