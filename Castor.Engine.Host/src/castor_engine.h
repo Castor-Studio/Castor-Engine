@@ -17,7 +17,7 @@ extern "C"
 {
 #endif
 
-#define CASTOR_ENGINE_ABI_VERSION 8
+#define CASTOR_ENGINE_ABI_VERSION 9
 #define CASTOR_ENGINE_VERSION "0.1.0-alpha.1"
 
     CASTOR_ENGINE_API uint32_t castor_engine_get_abi_version(void);

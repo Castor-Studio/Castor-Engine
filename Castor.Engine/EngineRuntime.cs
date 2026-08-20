@@ -504,6 +504,86 @@ namespace Castor.Engine
         }
 
         /// <summary>
+        /// Gets whether a recording is currently active.
+        /// </summary>
+        public static bool IsRecordingActive =>
+            NativeMethods.IsRecordingActive() != 0;
+
+        /// <summary>
+        /// Starts recording the active main scene to an MKV file. If no
+        /// video encoder is configured yet, one is created automatically in
+        /// forced-software mode. The OBS ffmpeg_muxer output this uses
+        /// requires an audio track to start, so the OBS audio subsystem and
+        /// the AAC audio encoder are auto-configured the same way when
+        /// neither is configured yet, and the resulting MKV file carries
+        /// both a video and an audio track.
+        /// </summary>
+        /// <param name="configuration">The recording destination.</param>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown when <paramref name="configuration"/> is null.
+        /// </exception>
+        /// <exception cref="NotSupportedException">
+        /// Thrown when the native and managed ABI versions are incompatible.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the engine, video subsystem, or main scene is not
+        /// ready, the destination path is invalid, a recording is already
+        /// active, the configured video encoder is a hardware encoder, or
+        /// OBS cannot create, connect, or start the recording output.
+        /// </exception>
+        public static void StartRecording(EngineRecordingConfiguration configuration)
+        {
+            ArgumentNullException.ThrowIfNull(configuration);
+            EngineInfo.ValidateCompatibility();
+
+            nint destinationPathPointer = nint.Zero;
+
+            try
+            {
+                destinationPathPointer = Marshal.StringToCoTaskMemUTF8(configuration.DestinationPath);
+
+                var nativeConfiguration = new NativeEngineRecordingConfiguration
+                {
+                    StructSize = checked(
+                        (uint)Marshal.SizeOf<NativeEngineRecordingConfiguration>()),
+                    DestinationPath = destinationPathPointer,
+                };
+
+                var result = NativeMethods.StartRecording(in nativeConfiguration);
+
+                if (result != NativeEngineResult.Ok)
+                {
+                    throw CreateNativeOperationException(
+                        "start the recording",
+                        result);
+                }
+            }
+            finally
+            {
+                Marshal.FreeCoTaskMem(destinationPathPointer);
+            }
+        }
+
+        /// <summary>
+        /// Stops the active recording and blocks until OBS has finalized
+        /// the MKV container before returning.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when no recording is active.
+        /// </exception>
+        public static void StopRecording()
+        {
+            var result = NativeMethods.StopRecording();
+
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException(
+                    "stop the recording",
+                    result);
+            }
+        }
+
+        /// <summary>
         /// Creates the engine-owned main scene, adds a solid-color source,
         /// and connects it to the primary OBS video output.
         /// </summary>

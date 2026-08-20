@@ -39,6 +39,15 @@ namespace Castor.Engine.Interop
         AudioEncoderAlreadyConfigured = 26,
         AudioEncoderUnavailable = 27,
         AudioEncoderCreationFailed = 28,
+
+        RecordingNoActiveScene = 29,
+        RecordingHardwareEncoderNotAllowed = 30,
+        RecordingAlreadyActive = 31,
+        RecordingNotActive = 32,
+        RecordingInvalidDestination = 33,
+        RecordingOutputUnavailable = 34,
+        RecordingOutputCreationFailed = 35,
+        RecordingStartFailed = 36,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -92,6 +101,13 @@ namespace Castor.Engine.Interop
         internal FixedBuffer128 Name;
         internal byte IsHardware;
         internal byte IsAvailable;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineRecordingConfiguration
+    {
+        internal uint StructSize;
+        internal nint DestinationPath;
     }
 
     internal static partial class NativeMethods
@@ -267,6 +283,25 @@ namespace Castor.Engine.Interop
             EntryPoint = "castor_engine_get_audio_encoder_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial nint GetAudioEncoderHandle();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_start_recording")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult StartRecording(
+            in NativeEngineRecordingConfiguration configuration);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_stop_recording")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult StopRecording();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_is_recording_active")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte IsRecordingActive();
 
         [LibraryImport(
             LibraryName,
