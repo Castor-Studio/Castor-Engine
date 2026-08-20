@@ -34,3 +34,5 @@ This repository does not contain:
 - [OBS SDK workflow](docs/obs-sdk-workflow.md)
 - [OBS video configuration](docs/video-configuration.md)
 - [Default OBS main scene](docs/main-scene.md)
+- [Video and audio encoder configuration](docs/video-encoder-configuration.md)
+- [MKV recording](docs/recording.md)

@@ -1,10 +1,17 @@
 #include "castor_engine.h"
 
 #include "audio_configuration.h"
+#include "audio_encoder_configuration.h"
+#include "audio_encoder_subsystem.h"
 #include "audio_subsystem.h"
 #include "main_scene.h"
 #include "obs_scene_backend.h"
+#include "recording_configuration.h"
+#include "recording_subsystem.h"
 #include "video_configuration.h"
+#include "video_encoder_configuration.h"
+#include "video_encoder_enumeration.h"
+#include "video_encoder_subsystem.h"
 
 #include <filesystem>
 #include <mutex>
@@ -22,6 +29,9 @@ thread_local std::string last_error;
 
 castor::engine::detail::video_subsystem video;
 castor::engine::detail::audio_subsystem audio;
+castor::engine::detail::video_encoder_subsystem video_encoder;
+castor::engine::detail::audio_encoder_subsystem audio_encoder;
+castor::engine::detail::recording_subsystem recording;
 castor::engine::detail::obs_scene_backend scene_backend;
 castor::engine::detail::main_scene_subsystem main_scene(scene_backend);
 
@@ -121,7 +131,10 @@ std::string describe_module_failures(const obs_module_failure_info& failure_info
 void rollback_startup(bool started_here)
 {
     modules_loaded = false;
+    recording.reset();
     main_scene.reset();
+    video_encoder.reset();
+    audio_encoder.reset();
     video.reset();
     audio.reset();
     unregister_libobs_data_path();
@@ -404,6 +417,375 @@ uint8_t castor_engine_get_audio_config(castor_engine_audio_config_t* out_config)
     return 1U;
 }
 
+uint32_t castor_engine_get_video_encoder_count(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+
+    if (!obs_initialized() || !modules_loaded)
+    {
+        return 0;
+    }
+
+    return castor::engine::detail::get_video_encoder_count();
+}
+
+uint8_t castor_engine_get_video_encoder_at(uint32_t index, castor_engine_video_encoder_info_t* out_info)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (out_info == nullptr)
+    {
+        set_last_error("The output video encoder info pointer must not be null.");
+        return 0U;
+    }
+
+    if (out_info->struct_size < sizeof(castor_engine_video_encoder_info_t))
+    {
+        set_last_error("The output video encoder info structure is too small. Expected at least " +
+                       std::to_string(sizeof(castor_engine_video_encoder_info_t)) + " bytes, received " +
+                       std::to_string(out_info->struct_size) + ".");
+        return 0U;
+    }
+
+    if (!obs_initialized() || !modules_loaded)
+    {
+        set_last_error("The engine must be initialized before video encoders can be enumerated.");
+        return 0U;
+    }
+
+    if (!castor::engine::detail::get_video_encoder_at(index, *out_info))
+    {
+        set_last_error("No video encoder exists at index " + std::to_string(index) + ".");
+        return 0U;
+    }
+
+    return 1U;
+}
+
+castor_engine_result_t castor_engine_validate_video_encoder_config(const castor_engine_video_encoder_config_t* config)
+{
+    last_error.clear();
+
+    castor::engine::detail::video_encoder_configuration_result result =
+        castor::engine::detail::validate_video_encoder_config(config);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_configure_video_encoder(const castor_engine_video_encoder_config_t* config)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    castor::engine::detail::video_encoder_lifecycle_result result =
+        video_encoder.configure(config, obs_initialized() && modules_loaded, video.is_configured());
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+uint8_t castor_engine_is_video_encoder_configured(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return video_encoder.is_configured() ? 1U : 0U;
+}
+
+uint8_t castor_engine_get_video_encoder_config(castor_engine_video_encoder_config_t* out_config)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (out_config == nullptr)
+    {
+        set_last_error("The output video encoder configuration pointer must not be null.");
+        return 0U;
+    }
+
+    if (out_config->struct_size < sizeof(castor_engine_video_encoder_config_t))
+    {
+        set_last_error("The output video encoder configuration structure is too small. Expected at least " +
+                       std::to_string(sizeof(castor_engine_video_encoder_config_t)) + " bytes, received " +
+                       std::to_string(out_config->struct_size) + ".");
+        return 0U;
+    }
+
+    if (!video_encoder.get_effective_config(out_config))
+    {
+        set_last_error("The video encoder is not configured.");
+        return 0U;
+    }
+
+    return 1U;
+}
+
+uint8_t castor_engine_get_selected_video_encoder(castor_engine_video_encoder_info_t* out_info)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (out_info == nullptr)
+    {
+        set_last_error("The output video encoder info pointer must not be null.");
+        return 0U;
+    }
+
+    if (out_info->struct_size < sizeof(castor_engine_video_encoder_info_t))
+    {
+        set_last_error("The output video encoder info structure is too small. Expected at least " +
+                       std::to_string(sizeof(castor_engine_video_encoder_info_t)) + " bytes, received " +
+                       std::to_string(out_info->struct_size) + ".");
+        return 0U;
+    }
+
+    if (!video_encoder.get_selected_encoder_info(out_info))
+    {
+        set_last_error("The video encoder is not configured.");
+        return 0U;
+    }
+
+    return 1U;
+}
+
+const char* castor_engine_get_video_encoder_fallback_notice(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return video_encoder.get_fallback_notice();
+}
+
+castor_engine_result_t castor_engine_validate_audio_encoder_config(const castor_engine_video_encoder_config_t* config)
+{
+    last_error.clear();
+
+    castor::engine::detail::audio_encoder_configuration_result result =
+        castor::engine::detail::validate_audio_encoder_config(config);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_configure_audio_encoder(const castor_engine_video_encoder_config_t* config)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    castor::engine::detail::audio_encoder_lifecycle_result result =
+        audio_encoder.configure(config, obs_initialized() && modules_loaded, audio.is_configured());
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+uint8_t castor_engine_is_audio_encoder_configured(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return audio_encoder.is_configured() ? 1U : 0U;
+}
+
+uint8_t castor_engine_get_selected_audio_encoder(castor_engine_video_encoder_info_t* out_info)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (out_info == nullptr)
+    {
+        set_last_error("The output audio encoder info pointer must not be null.");
+        return 0U;
+    }
+
+    if (out_info->struct_size < sizeof(castor_engine_video_encoder_info_t))
+    {
+        set_last_error("The output audio encoder info structure is too small. Expected at least " +
+                       std::to_string(sizeof(castor_engine_video_encoder_info_t)) + " bytes, received " +
+                       std::to_string(out_info->struct_size) + ".");
+        return 0U;
+    }
+
+    if (!audio_encoder.get_selected_encoder_info(out_info))
+    {
+        set_last_error("The audio encoder is not configured.");
+        return 0U;
+    }
+
+    return 1U;
+}
+
+void* castor_engine_get_video_encoder_handle(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return video_encoder.get_native_encoder();
+}
+
+void* castor_engine_get_audio_encoder_handle(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return audio_encoder.get_native_encoder();
+}
+
+castor_engine_result_t castor_engine_validate_recording_config(const castor_engine_recording_config_t* config)
+{
+    last_error.clear();
+
+    castor::engine::detail::recording_configuration_result result =
+        castor::engine::detail::validate_recording_config(config);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_start_recording(const castor_engine_recording_config_t* config)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    castor::engine::detail::recording_configuration_result validation_result =
+        castor::engine::detail::validate_recording_config(config);
+
+    if (validation_result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(validation_result.message));
+        return validation_result.code;
+    }
+
+    const bool runtime_ready = obs_initialized() && modules_loaded;
+    const bool video_ready = runtime_ready && video.is_configured();
+
+    if (runtime_ready && video_ready && !video_encoder.is_configured())
+    {
+        castor_engine_video_encoder_config_t default_encoder_config{};
+        default_encoder_config.struct_size = sizeof(default_encoder_config);
+        default_encoder_config.selection_mode = CASTOR_ENGINE_VIDEO_ENCODER_SOFTWARE_FORCED;
+        default_encoder_config.bitrate = 2500;
+        default_encoder_config.rate_control = CASTOR_ENGINE_VIDEO_ENCODER_RATE_CONTROL_CBR;
+
+        castor::engine::detail::video_encoder_lifecycle_result auto_configure_result =
+            video_encoder.configure(&default_encoder_config, runtime_ready, video_ready);
+
+        if (auto_configure_result.code != CASTOR_ENGINE_OK)
+        {
+            set_last_error(std::move(auto_configure_result.message));
+            return auto_configure_result.code;
+        }
+    }
+
+    if (video_encoder.is_configured())
+    {
+        castor_engine_video_encoder_info_t selected_info{};
+        selected_info.struct_size = sizeof(selected_info);
+
+        if (video_encoder.get_selected_encoder_info(&selected_info) && selected_info.is_hardware != 0)
+        {
+            set_last_error(
+                "Recording requires a software video encoder, but the configured video encoder is a hardware "
+                "encoder. Shut down the engine and let recording auto-configure a software encoder, or "
+                "configure a software video encoder explicitly before starting a recording.");
+            return CASTOR_ENGINE_RECORDING_HARDWARE_ENCODER_NOT_ALLOWED;
+        }
+    }
+
+    // OBS's ffmpeg_muxer output (the one this feature uses, and the one
+    // named explicitly in this issue) refuses to start without an audio
+    // encoder bound, even for a video-only recording - obs_output_start
+    // fails immediately, with no error text, for an encoded AV-capable
+    // output missing its audio encoder. obs_output_set_mixers cannot work
+    // around this either ("Tried to use obs_output_set_mixers on an
+    // encoded output" is rejected by OBS itself). So recording always
+    // auto-configures the audio subsystem and the AAC audio encoder too,
+    // the same way it already does for the video encoder, rather than
+    // leaving recording permanently broken.
+    bool audio_ready = runtime_ready && audio.is_configured();
+
+    if (runtime_ready && !audio_ready)
+    {
+        castor_engine_audio_config_t default_audio_config{};
+        default_audio_config.struct_size = sizeof(default_audio_config);
+
+        castor::engine::detail::audio_lifecycle_result audio_result =
+            audio.configure(&default_audio_config, runtime_ready);
+
+        if (audio_result.code != CASTOR_ENGINE_OK)
+        {
+            set_last_error(std::move(audio_result.message));
+            return audio_result.code;
+        }
+
+        audio_ready = true;
+    }
+
+    if (runtime_ready && audio_ready && !audio_encoder.is_configured())
+    {
+        castor_engine_video_encoder_config_t default_audio_encoder_config{};
+        default_audio_encoder_config.struct_size = sizeof(default_audio_encoder_config);
+        default_audio_encoder_config.audio_bitrate = 128;
+        default_audio_encoder_config.audio_track_index = 0;
+
+        castor::engine::detail::audio_encoder_lifecycle_result audio_encoder_result =
+            audio_encoder.configure(&default_audio_encoder_config, runtime_ready, audio_ready);
+
+        if (audio_encoder_result.code != CASTOR_ENGINE_OK)
+        {
+            set_last_error(std::move(audio_encoder_result.message));
+            return audio_encoder_result.code;
+        }
+    }
+
+    const bool scene_active = runtime_ready && main_scene.is_active();
+    void* video_encoder_handle = video_encoder.get_native_encoder();
+    void* audio_encoder_handle = audio_encoder.get_native_encoder();
+
+    castor::engine::detail::recording_lifecycle_result result =
+        recording.start(config, runtime_ready, video_ready, scene_active, video_encoder_handle, audio_encoder_handle);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_stop_recording(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    castor::engine::detail::recording_lifecycle_result result = recording.stop();
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+uint8_t castor_engine_is_recording_active(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return recording.is_active() ? 1U : 0U;
+}
+
 castor_engine_result_t castor_engine_create_main_scene(void)
 {
     std::scoped_lock lock(lifecycle_mutex);
@@ -456,7 +838,10 @@ void castor_engine_shutdown(void)
 {
     std::scoped_lock lock(lifecycle_mutex);
 
+    recording.reset();
     main_scene.reset();
+    video_encoder.reset();
+    audio_encoder.reset();
     video.reset();
 
     if (obs_initialized())
