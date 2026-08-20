@@ -16,7 +16,7 @@ class video_encoder_subsystem final
 {
   public:
     video_encoder_lifecycle_result configure(const castor_engine_video_encoder_config_t* config, bool runtime_ready,
-                                              bool video_ready);
+                                             bool video_ready);
 
     bool is_configured() noexcept;
 

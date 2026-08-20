@@ -219,7 +219,7 @@ extern "C"
      * is out of range, the pointer is null, or struct_size is too small.
      */
     CASTOR_ENGINE_API uint8_t castor_engine_get_video_encoder_at(uint32_t index,
-                                                                  castor_engine_video_encoder_info_t* out_info);
+                                                                 castor_engine_video_encoder_info_t* out_info);
 
     /**
      * Validates a video encoder configuration in isolation. This does not
@@ -262,8 +262,7 @@ extern "C"
      * last successful castor_engine_configure_video_encoder call. Returns 0
      * when no video encoder is configured.
      */
-    CASTOR_ENGINE_API uint8_t
-    castor_engine_get_selected_video_encoder(castor_engine_video_encoder_info_t* out_info);
+    CASTOR_ENGINE_API uint8_t castor_engine_get_selected_video_encoder(castor_engine_video_encoder_info_t* out_info);
 
     /**
      * Describes why the video encoder fell back from hardware to software,
@@ -305,8 +304,7 @@ extern "C"
      * is_hardware is always 0. Returns 0 when no audio encoder is
      * configured.
      */
-    CASTOR_ENGINE_API uint8_t
-    castor_engine_get_selected_audio_encoder(castor_engine_video_encoder_info_t* out_info);
+    CASTOR_ENGINE_API uint8_t castor_engine_get_selected_audio_encoder(castor_engine_video_encoder_info_t* out_info);
 
     /**
      * Retrieves an opaque, engine-owned handle to the configured video

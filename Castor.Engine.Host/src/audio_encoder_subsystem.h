@@ -16,7 +16,7 @@ class audio_encoder_subsystem final
 {
   public:
     audio_encoder_lifecycle_result configure(const castor_engine_video_encoder_config_t* config, bool runtime_ready,
-                                              bool audio_ready);
+                                             bool audio_ready);
 
     bool is_configured() noexcept;
 

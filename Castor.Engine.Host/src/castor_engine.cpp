@@ -754,8 +754,8 @@ castor_engine_result_t castor_engine_start_recording(const castor_engine_recordi
     void* video_encoder_handle = video_encoder.get_native_encoder();
     void* audio_encoder_handle = audio_encoder.get_native_encoder();
 
-    castor::engine::detail::recording_lifecycle_result result = recording.start(
-        config, runtime_ready, video_ready, scene_active, video_encoder_handle, audio_encoder_handle);
+    castor::engine::detail::recording_lifecycle_result result =
+        recording.start(config, runtime_ready, video_ready, scene_active, video_encoder_handle, audio_encoder_handle);
 
     if (result.code != CASTOR_ENGINE_OK)
     {

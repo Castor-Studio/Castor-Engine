@@ -69,21 +69,20 @@ video_encoder_configuration_result validate_video_encoder_config(const castor_en
 
     if (!is_null_terminated(config->encoder_id, sizeof(config->encoder_id)))
     {
-        return failure(CASTOR_ENGINE_INVALID_ARGUMENT,
-                       "The video encoder identifier must be null-terminated within " +
-                           std::to_string(sizeof(config->encoder_id)) + " bytes.");
+        return failure(CASTOR_ENGINE_INVALID_ARGUMENT, "The video encoder identifier must be null-terminated within " +
+                                                           std::to_string(sizeof(config->encoder_id)) + " bytes.");
     }
 
     if (!is_null_terminated(config->preset, sizeof(config->preset)))
     {
         return failure(CASTOR_ENGINE_INVALID_ARGUMENT, "The video encoder preset must be null-terminated within " +
-                                                            std::to_string(sizeof(config->preset)) + " bytes.");
+                                                           std::to_string(sizeof(config->preset)) + " bytes.");
     }
 
     if (!is_null_terminated(config->profile, sizeof(config->profile)))
     {
         return failure(CASTOR_ENGINE_INVALID_ARGUMENT, "The video encoder profile must be null-terminated within " +
-                                                             std::to_string(sizeof(config->profile)) + " bytes.");
+                                                           std::to_string(sizeof(config->profile)) + " bytes.");
     }
 
     return {CASTOR_ENGINE_OK, {}};

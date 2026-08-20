@@ -19,7 +19,7 @@ video_encoder_lifecycle_result failure(castor_engine_result_t code, std::string 
 }
 
 bool video_encoder_configs_match(const castor_engine_video_encoder_config_t& left,
-                                  const castor_engine_video_encoder_config_t& right)
+                                 const castor_engine_video_encoder_config_t& right)
 {
     return left.selection_mode == right.selection_mode && std::strcmp(left.encoder_id, right.encoder_id) == 0 &&
            left.bitrate == right.bitrate && left.rate_control == right.rate_control &&
@@ -135,7 +135,7 @@ const char* rate_control_string(uint32_t rate_control)
 } // namespace
 
 video_encoder_lifecycle_result video_encoder_subsystem::configure(const castor_engine_video_encoder_config_t* config,
-                                                                    bool runtime_ready, bool video_ready)
+                                                                  bool runtime_ready, bool video_ready)
 {
     const video_encoder_configuration_result validation_result = validate_video_encoder_config(config);
 
@@ -179,16 +179,16 @@ video_encoder_lifecycle_result video_encoder_subsystem::configure(const castor_e
 
         if (!selected.has_value())
         {
-            return failure(CASTOR_ENGINE_VIDEO_ENCODER_UNKNOWN_ID,
-                           std::string("No video encoder with identifier '") + config->encoder_id +
-                               "' is available in the current OBS runtime.");
+            return failure(CASTOR_ENGINE_VIDEO_ENCODER_UNKNOWN_ID, std::string("No video encoder with identifier '") +
+                                                                       config->encoder_id +
+                                                                       "' is available in the current OBS runtime.");
         }
 
         if (selected->is_available == 0)
         {
-            return failure(CASTOR_ENGINE_VIDEO_ENCODER_UNAVAILABLE,
-                           std::string("The requested video encoder '") + config->encoder_id +
-                               "' is not currently available.");
+            return failure(CASTOR_ENGINE_VIDEO_ENCODER_UNAVAILABLE, std::string("The requested video encoder '") +
+                                                                        config->encoder_id +
+                                                                        "' is not currently available.");
         }
     }
     else if (config->selection_mode == CASTOR_ENGINE_VIDEO_ENCODER_SOFTWARE_FORCED)
@@ -220,8 +220,8 @@ video_encoder_lifecycle_result video_encoder_subsystem::configure(const castor_e
             }
 
             fallback_notice = "Hardware-preferred video encoding was requested, but no hardware video encoder "
-                               "is currently available; falling back to the software encoder '" +
-                               std::string(selected->id) + "'.";
+                              "is currently available; falling back to the software encoder '" +
+                              std::string(selected->id) + "'.";
         }
     }
 

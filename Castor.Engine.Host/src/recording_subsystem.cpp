@@ -42,8 +42,8 @@ void handle_stop_signal(void* data, calldata_t*)
 } // namespace
 
 recording_lifecycle_result recording_subsystem::start(const castor_engine_recording_config_t* config,
-                                                        bool runtime_ready, bool video_ready, bool scene_active,
-                                                        void* video_encoder_handle, void* audio_encoder_handle)
+                                                      bool runtime_ready, bool video_ready, bool scene_active,
+                                                      void* video_encoder_handle, void* audio_encoder_handle)
 {
     const recording_configuration_result validation_result = validate_recording_config(config);
 
@@ -86,8 +86,8 @@ recording_lifecycle_result recording_subsystem::start(const castor_engine_record
     if (!parent_directory.empty() && !std::filesystem::is_directory(parent_directory, filesystem_error))
     {
         return failure(CASTOR_ENGINE_RECORDING_INVALID_DESTINATION,
-                       std::string("The recording destination directory does not exist: ") +
-                           config->destination_path + ".");
+                       std::string("The recording destination directory does not exist: ") + config->destination_path +
+                           ".");
     }
 
     if (obs_get_output_flags(recording_output_id) == 0)

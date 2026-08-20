@@ -35,9 +35,9 @@ audio_encoder_configuration_result validate_audio_encoder_config(const castor_en
 
     if (config->audio_track_index >= MAX_AUDIO_MIXES)
     {
-        return failure(CASTOR_ENGINE_INVALID_ARGUMENT,
-                       "The audio track index must be less than " + std::to_string(MAX_AUDIO_MIXES) +
-                           ", received " + std::to_string(config->audio_track_index) + ".");
+        return failure(CASTOR_ENGINE_INVALID_ARGUMENT, "The audio track index must be less than " +
+                                                           std::to_string(MAX_AUDIO_MIXES) + ", received " +
+                                                           std::to_string(config->audio_track_index) + ".");
     }
 
     return {CASTOR_ENGINE_OK, {}};

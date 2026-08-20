@@ -56,7 +56,7 @@ void copy_to_fixed_buffer(const char* source, char* destination, size_t destinat
 } // namespace
 
 audio_encoder_lifecycle_result audio_encoder_subsystem::configure(const castor_engine_video_encoder_config_t* config,
-                                                                    bool runtime_ready, bool audio_ready)
+                                                                  bool runtime_ready, bool audio_ready)
 {
     const audio_encoder_configuration_result validation_result = validate_audio_encoder_config(config);
 
@@ -120,7 +120,7 @@ audio_encoder_lifecycle_result audio_encoder_subsystem::configure(const castor_e
     selected_info_.struct_size = sizeof(castor_engine_video_encoder_info_t);
     copy_to_fixed_buffer(aac_id->c_str(), selected_info_.id, sizeof(selected_info_.id));
     copy_to_fixed_buffer(obs_encoder_get_display_name(aac_id->c_str()), selected_info_.name,
-                          sizeof(selected_info_.name));
+                         sizeof(selected_info_.name));
     selected_info_.is_hardware = 0U;
     selected_info_.is_available = 1U;
 
