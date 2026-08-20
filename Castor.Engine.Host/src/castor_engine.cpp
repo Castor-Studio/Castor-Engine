@@ -7,6 +7,7 @@
 #include "main_scene.h"
 #include "obs_scene_backend.h"
 #include "recording_configuration.h"
+#include "recording_subsystem.h"
 #include "video_configuration.h"
 #include "video_encoder_configuration.h"
 #include "video_encoder_enumeration.h"
@@ -30,6 +31,7 @@ castor::engine::detail::video_subsystem video;
 castor::engine::detail::audio_subsystem audio;
 castor::engine::detail::video_encoder_subsystem video_encoder;
 castor::engine::detail::audio_encoder_subsystem audio_encoder;
+castor::engine::detail::recording_subsystem recording;
 castor::engine::detail::obs_scene_backend scene_backend;
 castor::engine::detail::main_scene_subsystem main_scene(scene_backend);
 
@@ -129,6 +131,7 @@ std::string describe_module_failures(const obs_module_failure_info& failure_info
 void rollback_startup(bool started_here)
 {
     modules_loaded = false;
+    recording.reset();
     main_scene.reset();
     video_encoder.reset();
     audio_encoder.reset();
@@ -651,6 +654,91 @@ castor_engine_result_t castor_engine_validate_recording_config(const castor_engi
     return result.code;
 }
 
+castor_engine_result_t castor_engine_start_recording(const castor_engine_recording_config_t* config)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    castor::engine::detail::recording_configuration_result validation_result =
+        castor::engine::detail::validate_recording_config(config);
+
+    if (validation_result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(validation_result.message));
+        return validation_result.code;
+    }
+
+    const bool runtime_ready = obs_initialized() && modules_loaded;
+    const bool video_ready = runtime_ready && video.is_configured();
+
+    if (runtime_ready && video_ready && !video_encoder.is_configured())
+    {
+        castor_engine_video_encoder_config_t default_encoder_config{};
+        default_encoder_config.struct_size = sizeof(default_encoder_config);
+        default_encoder_config.selection_mode = CASTOR_ENGINE_VIDEO_ENCODER_SOFTWARE_FORCED;
+        default_encoder_config.bitrate = 2500;
+        default_encoder_config.rate_control = CASTOR_ENGINE_VIDEO_ENCODER_RATE_CONTROL_CBR;
+
+        castor::engine::detail::video_encoder_lifecycle_result auto_configure_result =
+            video_encoder.configure(&default_encoder_config, runtime_ready, video_ready);
+
+        if (auto_configure_result.code != CASTOR_ENGINE_OK)
+        {
+            set_last_error(std::move(auto_configure_result.message));
+            return auto_configure_result.code;
+        }
+    }
+
+    if (video_encoder.is_configured())
+    {
+        castor_engine_video_encoder_info_t selected_info{};
+        selected_info.struct_size = sizeof(selected_info);
+
+        if (video_encoder.get_selected_encoder_info(&selected_info) && selected_info.is_hardware != 0)
+        {
+            set_last_error(
+                "Recording requires a software video encoder, but the configured video encoder is a hardware "
+                "encoder. Shut down the engine and let recording auto-configure a software encoder, or "
+                "configure a software video encoder explicitly before starting a recording.");
+            return CASTOR_ENGINE_RECORDING_HARDWARE_ENCODER_NOT_ALLOWED;
+        }
+    }
+
+    const bool scene_active = runtime_ready && main_scene.is_active();
+    void* video_encoder_handle = video_encoder.get_native_encoder();
+
+    castor::engine::detail::recording_lifecycle_result result =
+        recording.start(config, runtime_ready, video_ready, scene_active, video_encoder_handle);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_stop_recording(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    castor::engine::detail::recording_lifecycle_result result = recording.stop();
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+uint8_t castor_engine_is_recording_active(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return recording.is_active() ? 1U : 0U;
+}
+
 castor_engine_result_t castor_engine_create_main_scene(void)
 {
     std::scoped_lock lock(lifecycle_mutex);
@@ -703,6 +791,7 @@ void castor_engine_shutdown(void)
 {
     std::scoped_lock lock(lifecycle_mutex);
 
+    recording.reset();
     main_scene.reset();
     video_encoder.reset();
     audio_encoder.reset();
