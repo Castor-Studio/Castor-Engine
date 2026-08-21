@@ -40,6 +40,13 @@ namespace Castor.Engine
             NativeMethods.HasActiveScene() != 0;
 
         /// <summary>
+        /// Gets whether the main scene currently uses an OBS display capture
+        /// source as its visual source.
+        /// </summary>
+        public static bool IsDisplayCaptureActive =>
+            NativeMethods.IsDisplayCaptureActive() != 0;
+
+        /// <summary>
         /// Initializes the OBS runtime and loads the packaged OBS modules.
         /// </summary>
         /// <param name="configuration">
@@ -108,6 +115,79 @@ namespace Castor.Engine
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(moduleName);
             return NativeMethods.IsModuleLoaded(moduleName) != 0;
+        }
+
+        /// <summary>
+        /// Enumerates displays exposed by the loaded OBS monitor-capture
+        /// source. An empty result represents a valid headless environment.
+        /// </summary>
+        public static IReadOnlyList<EngineDisplayInfo> EnumerateDisplays()
+        {
+            EngineInfo.ValidateCompatibility();
+            var count = NativeMethods.GetDisplayCount();
+
+            if (count == 0)
+            {
+                var error = GetLastErrorDetailOrNull();
+
+                if (error is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to enumerate displays: {error}");
+                }
+            }
+
+            var displays = new List<EngineDisplayInfo>((int)count);
+
+            for (uint index = 0; index < count; index++)
+            {
+                var nativeInfo = new NativeEngineDisplayInfo
+                {
+                    StructSize = checked((uint)Marshal.SizeOf<NativeEngineDisplayInfo>()),
+                };
+
+                if (NativeMethods.GetDisplayAt(index, ref nativeInfo) == 0)
+                {
+                    throw CreateNativeOperationException("enumerate displays");
+                }
+
+                displays.Add(new EngineDisplayInfo(
+                    FixedBufferInterop.Decode(nativeInfo.Id),
+                    FixedBufferInterop.Decode(nativeInfo.Name),
+                    nativeInfo.IsPrimary != 0));
+            }
+
+            return displays;
+        }
+
+        /// <summary>
+        /// Replaces the main scene's current visual source with capture of the
+        /// selected display. Repeating the same configuration is a no-op.
+        /// </summary>
+        public static void ConfigureDisplayCapture(
+            EngineDisplayCaptureConfiguration configuration)
+        {
+            ArgumentNullException.ThrowIfNull(configuration);
+            EngineInfo.ValidateCompatibility();
+
+            var nativeConfiguration = new NativeEngineDisplayCaptureConfiguration
+            {
+                StructSize = checked(
+                    (uint)Marshal.SizeOf<NativeEngineDisplayCaptureConfiguration>()),
+                CaptureCursor = configuration.CaptureCursor ? (byte)1 : (byte)0,
+            };
+            FixedBufferInterop.Encode(
+                configuration.DisplayId,
+                nativeConfiguration.DisplayId);
+
+            var result = NativeMethods.ConfigureDisplayCapture(in nativeConfiguration);
+
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException(
+                    "configure display capture",
+                    result);
+            }
         }
 
         /// <summary>
@@ -584,8 +664,9 @@ namespace Castor.Engine
         }
 
         /// <summary>
-        /// Creates the engine-owned main scene, adds a solid-color source,
-        /// and connects it to the primary OBS video output.
+        /// Creates the engine-owned main scene with a deterministic solid-color
+        /// source and connects it to the primary OBS video output. The visual
+        /// source can later be replaced through <see cref="ConfigureDisplayCapture"/>.
         /// </summary>
         /// <remarks>
         /// Repeated calls are idempotent while the main scene remains active.
@@ -636,14 +717,21 @@ namespace Castor.Engine
 
         private static string GetLastErrorDetail()
         {
+            var nativeMessage = GetLastErrorDetailOrNull();
+
+            return string.IsNullOrWhiteSpace(nativeMessage)
+                ? "The native engine did not provide additional diagnostics."
+                : nativeMessage;
+        }
+
+        private static string? GetLastErrorDetailOrNull()
+        {
             var errorPointer = NativeMethods.GetLastError();
             var nativeMessage = errorPointer == nint.Zero
                 ? null
                 : Marshal.PtrToStringUTF8(errorPointer);
 
-            return string.IsNullOrWhiteSpace(nativeMessage)
-                ? "The native engine did not provide additional diagnostics."
-                : nativeMessage;
+            return string.IsNullOrWhiteSpace(nativeMessage) ? null : nativeMessage;
         }
     }
 }

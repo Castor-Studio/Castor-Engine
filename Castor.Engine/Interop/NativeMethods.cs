@@ -48,6 +48,14 @@ namespace Castor.Engine.Interop
         RecordingOutputUnavailable = 34,
         RecordingOutputCreationFailed = 35,
         RecordingStartFailed = 36,
+
+        DisplayInvalidConfiguration = 37,
+        DisplayNotFound = 38,
+        DisplaySourceUnavailable = 39,
+        DisplaySourceCreationFailed = 40,
+        DisplaySourceAddFailed = 41,
+        DisplayNoActiveScene = 42,
+        DisplayReconfigurationWhileRecording = 43,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -110,6 +118,23 @@ namespace Castor.Engine.Interop
         internal nint DestinationPath;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineDisplayInfo
+    {
+        internal uint StructSize;
+        internal FixedBuffer256 Id;
+        internal FixedBuffer256 Name;
+        internal byte IsPrimary;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineDisplayCaptureConfiguration
+    {
+        internal uint StructSize;
+        internal FixedBuffer256 DisplayId;
+        internal byte CaptureCursor;
+    }
+
     internal static partial class NativeMethods
     {
         private const string LibraryName = "Castor.Engine.Host";
@@ -157,6 +182,33 @@ namespace Castor.Engine.Interop
             StringMarshalling = StringMarshalling.Utf8)]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial byte IsModuleLoaded(string moduleName);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_display_count")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial uint GetDisplayCount();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_display_at")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte GetDisplayAt(
+            uint index,
+            ref NativeEngineDisplayInfo info);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_configure_display_capture")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult ConfigureDisplayCapture(
+            in NativeEngineDisplayCaptureConfiguration configuration);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_is_display_capture_active")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte IsDisplayCaptureActive();
 
         [LibraryImport(
             LibraryName,

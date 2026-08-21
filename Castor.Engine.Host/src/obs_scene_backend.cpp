@@ -12,6 +12,8 @@ namespace
 constexpr const char* main_scene_name = "Castor Main Scene";
 constexpr const char* color_source_unversioned_id = "color_source";
 constexpr const char* color_source_name = "Castor Main Color Source";
+constexpr const char* display_source_unversioned_id = "monitor_capture";
+constexpr const char* display_source_name = "Castor Main Display Capture";
 constexpr uint32_t main_output_channel = 0;
 constexpr long long opaque_black = 0xFF000000LL;
 
@@ -89,6 +91,11 @@ bool obs_scene_backend::is_color_source_available() noexcept
     }
 }
 
+bool obs_scene_backend::is_display_source_available() noexcept
+{
+    return obs_get_latest_input_type_id(display_source_unversioned_id) != nullptr;
+}
+
 void* obs_scene_backend::create_color_source(uint32_t width, uint32_t height) noexcept
 {
     const char* source_id = obs_get_latest_input_type_id(color_source_unversioned_id);
@@ -110,6 +117,40 @@ void* obs_scene_backend::create_color_source(uint32_t width, uint32_t height) no
     obs_data_set_int(settings, "height", height);
 
     obs_source_t* source = obs_source_create(source_id, color_source_name, settings, nullptr);
+    obs_data_release(settings);
+    return source;
+}
+
+void* obs_scene_backend::create_display_source(bool uses_string_selector, const char* obs_monitor_id,
+                                               long long obs_monitor_index, bool capture_cursor) noexcept
+{
+    const char* source_id = obs_get_latest_input_type_id(display_source_unversioned_id);
+
+    if (source_id == nullptr)
+    {
+        return nullptr;
+    }
+
+    obs_data_t* settings = obs_data_create();
+
+    if (settings == nullptr)
+    {
+        return nullptr;
+    }
+
+    if (uses_string_selector)
+    {
+        obs_data_set_string(settings, "monitor_id", obs_monitor_id);
+    }
+    else
+    {
+        obs_data_set_int(settings, "monitor", obs_monitor_index);
+    }
+    obs_data_set_bool(settings, "capture_cursor", capture_cursor);
+    obs_data_set_int(settings, "method", 0);
+    obs_data_set_bool(settings, "force_sdr", false);
+
+    obs_source_t* source = obs_source_create(source_id, display_source_name, settings, nullptr);
     obs_data_release(settings);
     return source;
 }

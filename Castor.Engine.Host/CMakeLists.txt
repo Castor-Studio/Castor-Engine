@@ -12,6 +12,8 @@ add_library(Castor.Engine.Host SHARED
     src/audio_encoder_subsystem.cpp
     src/recording_configuration.cpp
     src/recording_subsystem.cpp
+    src/display_capture_configuration.cpp
+    src/obs_display_enumeration.cpp
 )
 
 target_include_directories(

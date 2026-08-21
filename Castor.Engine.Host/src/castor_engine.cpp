@@ -4,7 +4,9 @@
 #include "audio_encoder_configuration.h"
 #include "audio_encoder_subsystem.h"
 #include "audio_subsystem.h"
+#include "display_capture_configuration.h"
 #include "main_scene.h"
+#include "obs_display_enumeration.h"
 #include "obs_scene_backend.h"
 #include "recording_configuration.h"
 #include "recording_subsystem.h"
@@ -13,6 +15,8 @@
 #include "video_encoder_enumeration.h"
 #include "video_encoder_subsystem.h"
 
+#include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <mutex>
 #include <obs.h>
@@ -26,6 +30,8 @@ std::mutex lifecycle_mutex;
 bool modules_loaded = false;
 std::string registered_libobs_data_path;
 thread_local std::string last_error;
+std::vector<castor::engine::detail::display_descriptor> display_snapshot;
+bool display_snapshot_valid = false;
 
 castor::engine::detail::video_subsystem video;
 castor::engine::detail::audio_subsystem audio;
@@ -45,6 +51,37 @@ std::string path_to_utf8(const std::filesystem::path& path)
 void set_last_error(std::string message)
 {
     last_error = std::move(message);
+}
+
+void copy_to_fixed_buffer(const std::string& source, char* destination, size_t destination_size)
+{
+    std::memset(destination, 0, destination_size);
+    const size_t copy_size = std::min(source.size(), destination_size - 1);
+    std::memcpy(destination, source.data(), copy_size);
+}
+
+castor_engine_result_t refresh_display_snapshot()
+{
+    display_snapshot.clear();
+    display_snapshot_valid = false;
+
+    if (!obs_initialized() || !modules_loaded)
+    {
+        set_last_error("The engine and its OBS modules must be initialized before displays can be enumerated.");
+        return CASTOR_ENGINE_NOT_INITIALIZED;
+    }
+
+    castor::engine::detail::display_enumeration_result result = castor::engine::detail::enumerate_obs_displays();
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+        return result.code;
+    }
+
+    display_snapshot = std::move(result.displays);
+    display_snapshot_valid = true;
+    return CASTOR_ENGINE_OK;
 }
 
 void unregister_libobs_data_path()
@@ -131,6 +168,8 @@ std::string describe_module_failures(const obs_module_failure_info& failure_info
 void rollback_startup(bool started_here)
 {
     modules_loaded = false;
+    display_snapshot.clear();
+    display_snapshot_valid = false;
     recording.reset();
     main_scene.reset();
     video_encoder.reset();
@@ -329,6 +368,154 @@ uint8_t castor_engine_is_module_loaded(const char* module_name)
     }
 
     return obs_get_module(module_name) != nullptr ? 1U : 0U;
+}
+
+uint32_t castor_engine_get_display_count(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (refresh_display_snapshot() != CASTOR_ENGINE_OK)
+    {
+        return 0;
+    }
+
+    return static_cast<uint32_t>(display_snapshot.size());
+}
+
+uint8_t castor_engine_get_display_at(uint32_t index, castor_engine_display_info_t* out_info)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (out_info == nullptr)
+    {
+        set_last_error("The output display information pointer must not be null.");
+        return 0U;
+    }
+
+    if (out_info->struct_size < sizeof(castor_engine_display_info_t))
+    {
+        set_last_error("The output display information structure is too small. Expected at least " +
+                       std::to_string(sizeof(castor_engine_display_info_t)) + " bytes, received " +
+                       std::to_string(out_info->struct_size) + ".");
+        return 0U;
+    }
+
+    if (!display_snapshot_valid && refresh_display_snapshot() != CASTOR_ENGINE_OK)
+    {
+        return 0U;
+    }
+
+    if (index >= display_snapshot.size())
+    {
+        set_last_error("No display exists at index " + std::to_string(index) + ".");
+        return 0U;
+    }
+
+    const castor::engine::detail::display_descriptor& display = display_snapshot[index];
+    out_info->struct_size = sizeof(castor_engine_display_info_t);
+    copy_to_fixed_buffer(display.id, out_info->id, sizeof(out_info->id));
+    copy_to_fixed_buffer(display.name, out_info->name, sizeof(out_info->name));
+    out_info->is_primary = display.is_primary ? 1U : 0U;
+    return 1U;
+}
+
+castor_engine_result_t castor_engine_validate_display_capture_config(
+    const castor_engine_display_capture_config_t* config)
+{
+    last_error.clear();
+    castor::engine::detail::display_capture_configuration_result result =
+        castor::engine::detail::validate_display_capture_config(config);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_configure_display_capture(const castor_engine_display_capture_config_t* config)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    castor::engine::detail::display_capture_configuration_result validation =
+        castor::engine::detail::validate_display_capture_config(config);
+
+    if (validation.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(validation.message));
+        return validation.code;
+    }
+
+    if (!obs_initialized() || !modules_loaded)
+    {
+        set_last_error("The engine and its OBS modules must be initialized before display capture can be configured.");
+        return CASTOR_ENGINE_NOT_INITIALIZED;
+    }
+
+    if (!video.is_configured())
+    {
+        set_last_error("The video subsystem must be configured before display capture can be configured.");
+        return CASTOR_ENGINE_VIDEO_NOT_CONFIGURED;
+    }
+
+    if (!main_scene.is_active())
+    {
+        set_last_error("The main scene must be active before display capture can be configured.");
+        return CASTOR_ENGINE_DISPLAY_NO_ACTIVE_SCENE;
+    }
+
+    castor::engine::detail::display_enumeration_result enumeration = castor::engine::detail::enumerate_obs_displays();
+
+    if (enumeration.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(enumeration.message));
+        return enumeration.code;
+    }
+
+    const auto selected = std::find_if(enumeration.displays.begin(), enumeration.displays.end(),
+                                       [config](const auto& display) { return display.id == config->display_id; });
+
+    if (selected == enumeration.displays.end())
+    {
+        if (enumeration.displays.empty())
+        {
+            set_last_error("No interactive display is currently available for capture.");
+        }
+        else
+        {
+            set_last_error("The selected display '" + std::string(config->display_id) +
+                           "' is not currently available for capture.");
+        }
+
+        return CASTOR_ENGINE_DISPLAY_NOT_FOUND;
+    }
+
+    castor::engine::detail::main_scene_result result = main_scene.configure_display_capture(
+        config->display_id, selected->uses_string_selector, selected->obs_monitor_id.c_str(),
+        selected->obs_monitor_index, config->capture_cursor != 0, recording.is_active());
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+uint8_t castor_engine_is_display_capture_active(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+
+    if (!obs_initialized() || !modules_loaded)
+    {
+        return 0U;
+    }
+
+    return main_scene.is_display_capture_active() ? 1U : 0U;
 }
 
 castor_engine_result_t castor_engine_configure_video(const castor_engine_video_config_t* config)
@@ -850,6 +1037,8 @@ void castor_engine_shutdown(void)
     }
 
     modules_loaded = false;
+    display_snapshot.clear();
+    display_snapshot_valid = false;
     audio.reset();
 
     unregister_libobs_data_path();
