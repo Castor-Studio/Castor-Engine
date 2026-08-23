@@ -12,6 +12,9 @@ add_library(Castor.Engine.Host SHARED
     src/audio_encoder_subsystem.cpp
     src/recording_configuration.cpp
     src/recording_subsystem.cpp
+    src/streaming_configuration.cpp
+    src/streaming_subsystem.cpp
+    src/obs_streaming_backend.cpp
     src/display_capture_configuration.cpp
     src/obs_display_enumeration.cpp
 )
@@ -88,4 +91,27 @@ target_compile_features(
 add_test(
     NAME Castor.Engine.Host.MainScene
     COMMAND Castor.Engine.Host.Tests
+)
+
+add_executable(Castor.Engine.Host.Streaming.Tests
+    tests/streaming_tests.cpp
+    src/streaming_configuration.cpp
+    src/streaming_subsystem.cpp
+)
+
+target_include_directories(
+    Castor.Engine.Host.Streaming.Tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_compile_features(
+    Castor.Engine.Host.Streaming.Tests
+    PRIVATE
+        cxx_std_20
+)
+
+add_test(
+    NAME Castor.Engine.Host.Streaming
+    COMMAND Castor.Engine.Host.Streaming.Tests
 )

@@ -8,8 +8,11 @@
 #include "main_scene.h"
 #include "obs_display_enumeration.h"
 #include "obs_scene_backend.h"
+#include "obs_streaming_backend.h"
 #include "recording_configuration.h"
 #include "recording_subsystem.h"
+#include "streaming_configuration.h"
+#include "streaming_subsystem.h"
 #include "video_configuration.h"
 #include "video_encoder_configuration.h"
 #include "video_encoder_enumeration.h"
@@ -38,6 +41,8 @@ castor::engine::detail::audio_subsystem audio;
 castor::engine::detail::video_encoder_subsystem video_encoder;
 castor::engine::detail::audio_encoder_subsystem audio_encoder;
 castor::engine::detail::recording_subsystem recording;
+castor::engine::detail::obs_streaming_backend streaming_backend;
+castor::engine::detail::streaming_subsystem streaming(streaming_backend);
 castor::engine::detail::obs_scene_backend scene_backend;
 castor::engine::detail::main_scene_subsystem main_scene(scene_backend);
 
@@ -171,6 +176,7 @@ void rollback_startup(bool started_here)
     display_snapshot.clear();
     display_snapshot_valid = false;
     recording.reset();
+    streaming.reset();
     main_scene.reset();
     video_encoder.reset();
     audio_encoder.reset();
@@ -496,7 +502,7 @@ castor_engine_result_t castor_engine_configure_display_capture(const castor_engi
 
     castor::engine::detail::main_scene_result result = main_scene.configure_display_capture(
         config->display_id, selected->uses_string_selector, selected->obs_monitor_id.c_str(),
-        selected->obs_monitor_index, config->capture_cursor != 0, recording.is_active());
+        selected->obs_monitor_index, config->capture_cursor != 0, recording.is_active(), streaming.is_active());
 
     if (result.code != CASTOR_ENGINE_OK)
     {
@@ -855,6 +861,12 @@ castor_engine_result_t castor_engine_start_recording(const castor_engine_recordi
         return validation_result.code;
     }
 
+    if (streaming.is_active())
+    {
+        set_last_error("Recording cannot start while streaming is active.");
+        return CASTOR_ENGINE_STREAMING_CONFLICTING_OUTPUT_ACTIVE;
+    }
+
     const bool runtime_ready = obs_initialized() && modules_loaded;
     const bool video_ready = runtime_ready && video.is_configured();
 
@@ -973,6 +985,83 @@ uint8_t castor_engine_is_recording_active(void)
     return recording.is_active() ? 1U : 0U;
 }
 
+castor_engine_result_t castor_engine_validate_streaming_config(const castor_engine_streaming_config_t* config)
+{
+    last_error.clear();
+    castor::engine::detail::streaming_configuration_result result =
+        castor::engine::detail::validate_streaming_config(config);
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_configure_streaming(const castor_engine_streaming_config_t* config)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+    castor::engine::detail::streaming_lifecycle_result result =
+        streaming.configure(config, obs_initialized() && modules_loaded);
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_start_streaming(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+    const bool runtime_ready = obs_initialized() && modules_loaded;
+    castor::engine::detail::streaming_lifecycle_result result =
+        streaming.start(runtime_ready, runtime_ready && video.is_configured(), runtime_ready && audio.is_configured(),
+                        runtime_ready && main_scene.is_active(), recording.is_active(),
+                        video_encoder.get_native_encoder(), audio_encoder.get_native_encoder());
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_stop_streaming(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+    castor::engine::detail::streaming_lifecycle_result result = streaming.stop();
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_get_streaming_status(castor_engine_streaming_status_t* out_status)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+    castor::engine::detail::streaming_lifecycle_result result = streaming.get_status(out_status);
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_get_streaming_health(castor_engine_streaming_health_t* out_health)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+    castor::engine::detail::streaming_lifecycle_result result = streaming.get_health(out_health);
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+    return result.code;
+}
+
 castor_engine_result_t castor_engine_create_main_scene(void)
 {
     std::scoped_lock lock(lifecycle_mutex);
@@ -1025,6 +1114,12 @@ void castor_engine_shutdown(void)
 {
     std::scoped_lock lock(lifecycle_mutex);
 
+    if (!streaming.reset())
+    {
+        set_last_error(
+            "The active streaming output did not terminate; shutdown was deferred to preserve encoder ownership.");
+        return;
+    }
     recording.reset();
     main_scene.reset();
     video_encoder.reset();

@@ -589,6 +589,102 @@ namespace Castor.Engine
         public static bool IsRecordingActive =>
             NativeMethods.IsRecordingActive() != 0;
 
+        /// <summary>Configures the single custom RTMP destination.</summary>
+        public static void ConfigureStreaming(EngineStreamingConfiguration configuration)
+        {
+            ArgumentNullException.ThrowIfNull(configuration);
+            EngineInfo.ValidateCompatibility();
+
+            nint serverUrl = nint.Zero;
+            nint streamKey = nint.Zero;
+            nint username = nint.Zero;
+            nint password = nint.Zero;
+            try
+            {
+                serverUrl = Marshal.StringToCoTaskMemUTF8(configuration.ServerUrl);
+                streamKey = Marshal.StringToCoTaskMemUTF8(configuration.StreamKey);
+                username = Marshal.StringToCoTaskMemUTF8(configuration.Username);
+                password = Marshal.StringToCoTaskMemUTF8(configuration.Password);
+                var nativeConfiguration = new NativeEngineStreamingConfiguration
+                {
+                    StructSize = checked((uint)Marshal.SizeOf<NativeEngineStreamingConfiguration>()),
+                    ServerUrl = serverUrl,
+                    StreamKey = streamKey,
+                    UseAuthentication = configuration.UseAuthentication ? (byte)1 : (byte)0,
+                    Username = username,
+                    Password = password,
+                    ReconnectRetryCount = configuration.ReconnectRetryCount,
+                    ReconnectDelaySeconds = configuration.ReconnectDelaySeconds,
+                };
+                var result = NativeMethods.ConfigureStreaming(in nativeConfiguration);
+                if (result != NativeEngineResult.Ok)
+                {
+                    throw CreateNativeOperationException("configure streaming", result);
+                }
+            }
+            finally
+            {
+                Marshal.FreeCoTaskMem(serverUrl);
+                Marshal.FreeCoTaskMem(streamKey);
+                Marshal.FreeCoTaskMem(username);
+                Marshal.FreeCoTaskMem(password);
+            }
+        }
+
+        /// <summary>Starts streaming with the configured destination and shared encoders.</summary>
+        public static void StartStreaming()
+        {
+            EngineInfo.ValidateCompatibility();
+            var result = NativeMethods.StartStreaming();
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException("start streaming", result);
+            }
+        }
+
+        /// <summary>Stops the active stream and waits for the RTMP output to terminate.</summary>
+        public static void StopStreaming()
+        {
+            var result = NativeMethods.StopStreaming();
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException("stop streaming", result);
+            }
+        }
+
+        /// <summary>Gets the current asynchronous streaming status.</summary>
+        public static EngineStreamingStatus GetStreamingStatus()
+        {
+            var nativeStatus = new NativeEngineStreamingStatus
+            {
+                StructSize = checked((uint)Marshal.SizeOf<NativeEngineStreamingStatus>()),
+            };
+            var result = NativeMethods.GetStreamingStatus(ref nativeStatus);
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException("retrieve streaming status", result);
+            }
+            return new EngineStreamingStatus(
+                (EngineStreamingState)nativeStatus.State,
+                (EngineStreamingFailure)nativeStatus.LastFailureCode,
+                FixedBufferInterop.Decode(nativeStatus.LastFailureMessage));
+        }
+
+        /// <summary>Gets the current network delivery counters.</summary>
+        public static EngineStreamingHealth GetStreamingHealth()
+        {
+            var nativeHealth = new NativeEngineStreamingHealth
+            {
+                StructSize = checked((uint)Marshal.SizeOf<NativeEngineStreamingHealth>()),
+            };
+            var result = NativeMethods.GetStreamingHealth(ref nativeHealth);
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException("retrieve streaming health", result);
+            }
+            return new EngineStreamingHealth(nativeHealth.TotalFrames, nativeHealth.DroppedFrames);
+        }
+
         /// <summary>
         /// Starts recording the active main scene to an MKV file. If no
         /// video encoder is configured yet, one is created automatically in

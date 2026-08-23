@@ -27,6 +27,12 @@ namespace Castor.Engine.Interop
         private byte _element0;
     }
 
+    [InlineArray(512)]
+    internal struct FixedBuffer512
+    {
+        private byte _element0;
+    }
+
     /// <summary>
     /// Encodes and decodes the fixed-size, null-terminated UTF-8 buffers
     /// used by the native video encoder structs, since LibraryImport's

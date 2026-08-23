@@ -49,7 +49,7 @@ class main_scene_subsystem final
 
     main_scene_result configure_display_capture(const char* display_id, bool uses_string_selector,
                                                 const char* obs_monitor_id, long long obs_monitor_index,
-                                                bool capture_cursor, bool recording_active);
+                                                bool capture_cursor, bool recording_active, bool streaming_active);
 
     bool is_active() noexcept;
 
