@@ -1,8 +1,10 @@
 # Default OBS Main Scene
 
 Castor Engine owns a single default OBS scene that provides deterministic video
-content before capture and recording features are introduced. The scene contains
-one opaque-black color source and is connected to the primary OBS video output.
+content before a capture source is selected. The scene initially contains one
+opaque-black color source and is connected to the primary OBS video output. A
+successful display-capture configuration replaces that color source while
+keeping the scene and output connection alive.
 
 This feature is available starting with Castor Engine ABI version 4.
 
@@ -39,8 +41,8 @@ finally
 ```
 
 `EngineRuntime.CreateMainScene()` is idempotent while the engine-owned scene is
-active. Repeated calls reuse the existing scene, source, scene item, and output
-connection.
+active. Repeated calls reuse the existing scene, current visual source, scene
+item, and output connection.
 
 `EngineRuntime.HasActiveScene` is `true` only when all owned resources exist and
 the scene source is still connected to OBS output channel zero. It returns
@@ -63,7 +65,7 @@ The implementation is split into three layers:
 
 | Component | Responsibility |
 | --- | --- |
-| `main_scene_subsystem` | Owns the scene lifecycle, defines idempotence, and rolls back partial creation. |
+| `main_scene_subsystem` | Owns the scene and its replaceable visual source, defines idempotence, and rolls back partial creation. |
 | `scene_backend` | Abstracts the OBS operations so lifecycle failures can be tested without a running OBS instance. |
 | `obs_scene_backend` | Creates the real OBS resources, connects output channel zero, and synchronizes deferred destruction. |
 
@@ -110,7 +112,7 @@ Shutdown performs resource cleanup before stopping OBS:
 1. Disconnect the scene if it still owns output channel zero.
 2. Wait for queued graphics work to cross a synchronization barrier.
 3. Remove the scene item.
-4. Release the retained color-source reference.
+4. Release the retained color or display-capture source reference.
 5. Release the retained scene reference.
 6. Wait for the OBS destroy queue to process the released resources.
 7. Reset video and shut down OBS.

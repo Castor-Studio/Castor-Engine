@@ -28,7 +28,7 @@ main_scene_result main_scene_subsystem::create(bool runtime_ready, bool video_re
         return {CASTOR_ENGINE_OK, {}};
     }
 
-    if (scene_ != nullptr || color_source_ != nullptr || scene_item_ != nullptr)
+    if (scene_ != nullptr || visual_source_ != nullptr || scene_item_ != nullptr)
     {
         reset();
     }
@@ -59,16 +59,16 @@ main_scene_result main_scene_subsystem::create(bool runtime_ready, bool video_re
                        "The loaded OBS modules do not provide the 'color_source' video source.");
     }
 
-    color_source_ = backend_.create_color_source(width, height);
+    visual_source_ = backend_.create_color_source(width, height);
 
-    if (color_source_ == nullptr)
+    if (visual_source_ == nullptr)
     {
         reset();
         return failure(CASTOR_ENGINE_SCENE_SOURCE_CREATION_FAILED,
                        "OBS failed to create the solid-color video source for the main scene.");
     }
 
-    scene_item_ = backend_.add_source_to_scene(scene_, color_source_);
+    scene_item_ = backend_.add_source_to_scene(scene_, visual_source_);
 
     if (scene_item_ == nullptr)
     {
@@ -87,10 +87,75 @@ main_scene_result main_scene_subsystem::create(bool runtime_ready, bool video_re
     return {CASTOR_ENGINE_OK, {}};
 }
 
+main_scene_result main_scene_subsystem::configure_display_capture(const char* display_id, bool uses_string_selector,
+                                                                  const char* obs_monitor_id,
+                                                                  long long obs_monitor_index, bool capture_cursor,
+                                                                  bool recording_active)
+{
+    if (!is_active())
+    {
+        return failure(CASTOR_ENGINE_DISPLAY_NO_ACTIVE_SCENE,
+                       "The main scene must be active before a display capture can be configured.");
+    }
+
+    if (display_capture_active_ && display_id_ == display_id && capture_cursor_ == capture_cursor)
+    {
+        return {CASTOR_ENGINE_OK, {}};
+    }
+
+    if (recording_active)
+    {
+        return failure(CASTOR_ENGINE_DISPLAY_RECONFIGURATION_WHILE_RECORDING,
+                       "The display capture cannot be replaced while a recording is active.");
+    }
+
+    if (!backend_.is_display_source_available())
+    {
+        return failure(CASTOR_ENGINE_DISPLAY_SOURCE_UNAVAILABLE,
+                       "The loaded OBS modules do not provide the 'monitor_capture' video source.");
+    }
+
+    void* replacement_source =
+        backend_.create_display_source(uses_string_selector, obs_monitor_id, obs_monitor_index, capture_cursor);
+
+    if (replacement_source == nullptr)
+    {
+        return failure(CASTOR_ENGINE_DISPLAY_SOURCE_CREATION_FAILED,
+                       "OBS failed to create the display capture source for display '" + std::string(display_id) +
+                           "'.");
+    }
+
+    void* replacement_item = backend_.add_source_to_scene(scene_, replacement_source);
+
+    if (replacement_item == nullptr)
+    {
+        backend_.release_source(replacement_source);
+        backend_.wait_for_deferred_destruction();
+        return failure(CASTOR_ENGINE_DISPLAY_SOURCE_ADD_FAILED,
+                       "OBS failed to add the display capture source to the main scene.");
+    }
+
+    backend_.remove_source_from_scene(scene_item_);
+    backend_.release_source(visual_source_);
+
+    visual_source_ = replacement_source;
+    scene_item_ = replacement_item;
+    display_id_ = display_id;
+    capture_cursor_ = capture_cursor;
+    display_capture_active_ = true;
+    backend_.wait_for_deferred_destruction();
+    return {CASTOR_ENGINE_OK, {}};
+}
+
 bool main_scene_subsystem::is_active() noexcept
 {
-    return scene_ != nullptr && color_source_ != nullptr && scene_item_ != nullptr &&
+    return scene_ != nullptr && visual_source_ != nullptr && scene_item_ != nullptr &&
            backend_.is_scene_connected_to_output(scene_);
+}
+
+bool main_scene_subsystem::is_display_capture_active() noexcept
+{
+    return display_capture_active_ && is_active();
 }
 
 void main_scene_subsystem::reset() noexcept
@@ -108,10 +173,10 @@ void main_scene_subsystem::reset() noexcept
         scene_item_ = nullptr;
     }
 
-    if (color_source_ != nullptr)
+    if (visual_source_ != nullptr)
     {
-        backend_.release_source(color_source_);
-        color_source_ = nullptr;
+        backend_.release_source(visual_source_);
+        visual_source_ = nullptr;
         released_resources = true;
     }
 
@@ -126,5 +191,9 @@ void main_scene_subsystem::reset() noexcept
     {
         backend_.wait_for_deferred_destruction();
     }
+
+    display_id_.clear();
+    capture_cursor_ = false;
+    display_capture_active_ = false;
 }
 } // namespace castor::engine::detail

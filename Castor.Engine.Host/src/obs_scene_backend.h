@@ -12,6 +12,9 @@ class obs_scene_backend final : public scene_backend
 
     bool is_color_source_available() noexcept override;
     void* create_color_source(uint32_t width, uint32_t height) noexcept override;
+    bool is_display_source_available() noexcept override;
+    void* create_display_source(bool uses_string_selector, const char* obs_monitor_id, long long obs_monitor_index,
+                                bool capture_cursor) noexcept override;
     void release_source(void* source) noexcept override;
 
     void* add_source_to_scene(void* scene, void* source) noexcept override;

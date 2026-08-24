@@ -17,7 +17,7 @@ extern "C"
 {
 #endif
 
-#define CASTOR_ENGINE_ABI_VERSION 9
+#define CASTOR_ENGINE_ABI_VERSION 10
 #define CASTOR_ENGINE_VERSION "0.1.0-alpha.1"
 
     CASTOR_ENGINE_API uint32_t castor_engine_get_abi_version(void);
@@ -71,6 +71,14 @@ extern "C"
         CASTOR_ENGINE_RECORDING_OUTPUT_UNAVAILABLE = 34,
         CASTOR_ENGINE_RECORDING_OUTPUT_CREATION_FAILED = 35,
         CASTOR_ENGINE_RECORDING_START_FAILED = 36,
+
+        CASTOR_ENGINE_DISPLAY_INVALID_CONFIGURATION = 37,
+        CASTOR_ENGINE_DISPLAY_NOT_FOUND = 38,
+        CASTOR_ENGINE_DISPLAY_SOURCE_UNAVAILABLE = 39,
+        CASTOR_ENGINE_DISPLAY_SOURCE_CREATION_FAILED = 40,
+        CASTOR_ENGINE_DISPLAY_SOURCE_ADD_FAILED = 41,
+        CASTOR_ENGINE_DISPLAY_NO_ACTIVE_SCENE = 42,
+        CASTOR_ENGINE_DISPLAY_RECONFIGURATION_WHILE_RECORDING = 43,
     } castor_engine_result_t;
 
     typedef enum castor_engine_speaker_layout
@@ -165,6 +173,31 @@ extern "C"
         uint8_t is_available;
     } castor_engine_video_encoder_info_t;
 
+    /**
+     * Engine-owned metadata describing a display exposed by the loaded OBS
+     * display-capture source. Never
+     * carries an OBS or platform-native handle.
+     */
+    typedef struct castor_engine_display_info
+    {
+        uint32_t struct_size;
+        char id[256];
+        char name[256];
+        uint8_t is_primary;
+    } castor_engine_display_info_t;
+
+    /**
+     * A versioned request to replace the main scene's current visual source
+     * with a capture of the
+     * display identified by display_id.
+     */
+    typedef struct castor_engine_display_capture_config
+    {
+        uint32_t struct_size;
+        char display_id[256];
+        uint8_t capture_cursor;
+    } castor_engine_display_capture_config_t;
+
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_initialize(const castor_engine_config_t* config);
 
     CASTOR_ENGINE_API const char* castor_engine_get_last_error(void);
@@ -172,6 +205,39 @@ extern "C"
     CASTOR_ENGINE_API uint32_t castor_engine_get_loaded_module_count(void);
 
     CASTOR_ENGINE_API uint8_t castor_engine_is_module_loaded(const char* module_name);
+
+    /**
+     * Refreshes the engine-owned display snapshot from the properties exposed
+     * by OBS's registered
+     * monitor_capture source and returns its size. Returns
+     * 0 both for a valid headless environment and for an
+     * error; consult
+     * castor_engine_get_last_error to distinguish those cases.
+     */
+    CASTOR_ENGINE_API uint32_t castor_engine_get_display_count(void);
+
+    /**
+     * Retrieves one entry from the latest display snapshot. The caller must
+     * set struct_size before
+     * calling. If no snapshot exists yet, one is
+     * refreshed first.
+     */
+    CASTOR_ENGINE_API uint8_t castor_engine_get_display_at(uint32_t index, castor_engine_display_info_t* out_info);
+
+    /** Validates only the versioned configuration shape and values. */
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_validate_display_capture_config(const castor_engine_display_capture_config_t* config);
+
+    /**
+     * Replaces the main scene's current visual source with monitor_capture.
+     * An identical effective
+     * configuration is a no-op. A different
+     * configuration is rejected while recording.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_configure_display_capture(const castor_engine_display_capture_config_t* config);
+
+    CASTOR_ENGINE_API uint8_t castor_engine_is_display_capture_active(void);
 
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_configure_video(const castor_engine_video_config_t* config);
 

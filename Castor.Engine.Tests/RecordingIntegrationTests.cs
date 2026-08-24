@@ -93,6 +93,48 @@ namespace Castor.Engine.Tests
             // above and Dispose()'s EngineRuntime.Shutdown() call.
         }
 
+        [StaFact]
+        public void DisplayCaptureShouldProduceAPlayableMkvWhenAnInteractiveDisplayIsAvailable()
+        {
+            var path = Path.Combine(_tempDirectory, "display-capture-integration.mkv");
+            EngineRuntime.Initialize(new EngineRuntimeConfiguration(AppContext.BaseDirectory));
+            EngineRuntime.ConfigureVideo(
+                new EngineVideoConfiguration(1280, 720, 1280, 720, 30, 1));
+            EngineRuntime.CreateMainScene();
+
+            var displays = EngineRuntime.EnumerateDisplays();
+
+            if (displays.Count == 0)
+            {
+                throw Xunit.Sdk.SkipException.ForSkip(
+                    "No interactive display is available to exercise OBS display capture.");
+            }
+
+            var selectedDisplay = displays.FirstOrDefault(display => display.IsPrimary) ?? displays[0];
+            EngineRuntime.ConfigureDisplayCapture(
+                new EngineDisplayCaptureConfiguration(selectedDisplay.Id, captureCursor: true));
+            Assert.True(EngineRuntime.IsDisplayCaptureActive);
+
+            EngineRuntime.StartRecording(new EngineRecordingConfiguration(path));
+            Assert.True(EngineRuntime.IsRecordingActive);
+
+            var replacementException = Assert.Throws<InvalidOperationException>(
+                () => EngineRuntime.ConfigureDisplayCapture(
+                    new EngineDisplayCaptureConfiguration(selectedDisplay.Id, captureCursor: false)));
+            Assert.Contains("DisplayReconfigurationWhileRecording", replacementException.Message);
+
+            Thread.Sleep(500);
+            EngineRuntime.StopRecording();
+
+            Assert.True(File.Exists(path));
+            Assert.True(new FileInfo(path).Length > 0);
+
+            if (TryFindFfprobe(out var ffprobePath))
+            {
+                Assert.Equal("h264", ProbeCodec(ffprobePath, path, "v:0"));
+            }
+        }
+
         private static bool TryFindFfprobe(out string ffprobePath)
         {
             var pathVariable = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
