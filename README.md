@@ -37,3 +37,4 @@ This repository does not contain:
 - [Display capture](docs/display-capture.md)
 - [Video and audio encoder configuration](docs/video-encoder-configuration.md)
 - [MKV recording](docs/recording.md)
+- [RTMP streaming](docs/streaming.md)

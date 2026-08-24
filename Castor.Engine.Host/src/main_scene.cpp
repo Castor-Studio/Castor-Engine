@@ -90,7 +90,7 @@ main_scene_result main_scene_subsystem::create(bool runtime_ready, bool video_re
 main_scene_result main_scene_subsystem::configure_display_capture(const char* display_id, bool uses_string_selector,
                                                                   const char* obs_monitor_id,
                                                                   long long obs_monitor_index, bool capture_cursor,
-                                                                  bool recording_active)
+                                                                  bool recording_active, bool streaming_active)
 {
     if (!is_active())
     {
@@ -107,6 +107,12 @@ main_scene_result main_scene_subsystem::configure_display_capture(const char* di
     {
         return failure(CASTOR_ENGINE_DISPLAY_RECONFIGURATION_WHILE_RECORDING,
                        "The display capture cannot be replaced while a recording is active.");
+    }
+
+    if (streaming_active)
+    {
+        return failure(CASTOR_ENGINE_DISPLAY_RECONFIGURATION_WHILE_STREAMING,
+                       "The display capture cannot be replaced while streaming is active.");
     }
 
     if (!backend_.is_display_source_available())

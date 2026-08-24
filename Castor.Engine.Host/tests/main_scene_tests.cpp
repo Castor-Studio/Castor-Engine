@@ -287,8 +287,8 @@ bool display_capture_replaces_color_source_and_is_idempotent()
     fake_scene_backend backend;
     main_scene_subsystem scene(backend);
     const auto create_result = scene.create(true, true, 1280, 720);
-    const auto first_result = scene.configure_display_capture("display-1", true, "display-1", 0, true, false);
-    const auto second_result = scene.configure_display_capture("display-1", true, "display-1", 0, true, true);
+    const auto first_result = scene.configure_display_capture("display-1", true, "display-1", 0, true, false, false);
+    const auto second_result = scene.configure_display_capture("display-1", true, "display-1", 0, true, true, false);
 
     return expect(create_result.code == CASTOR_ENGINE_OK, "the initial scene is created") &&
            expect(first_result.code == CASTOR_ENGINE_OK, "display capture replaces the color source") &&
@@ -306,10 +306,10 @@ bool display_capture_replacement_is_transactional()
     fake_scene_backend backend;
     main_scene_subsystem scene(backend);
     scene.create(true, true, 1280, 720);
-    scene.configure_display_capture("display-1", true, "display-1", 0, true, false);
+    scene.configure_display_capture("display-1", true, "display-1", 0, true, false, false);
     backend.display_source_creation_succeeds = false;
 
-    const auto result = scene.configure_display_capture("display-2", true, "display-2", 0, false, false);
+    const auto result = scene.configure_display_capture("display-2", true, "display-2", 0, false, false, false);
 
     return expect(result.code == CASTOR_ENGINE_DISPLAY_SOURCE_CREATION_FAILED,
                   "replacement creation failure is explicit") &&
@@ -323,10 +323,10 @@ bool display_capture_add_failure_releases_only_the_replacement()
     fake_scene_backend backend;
     main_scene_subsystem scene(backend);
     scene.create(true, true, 1280, 720);
-    scene.configure_display_capture("display-1", true, "display-1", 0, true, false);
+    scene.configure_display_capture("display-1", true, "display-1", 0, true, false, false);
     backend.add_succeeds = false;
 
-    const auto result = scene.configure_display_capture("display-2", true, "display-2", 0, false, false);
+    const auto result = scene.configure_display_capture("display-2", true, "display-2", 0, false, false, false);
 
     return expect(result.code == CASTOR_ENGINE_DISPLAY_SOURCE_ADD_FAILED, "replacement add failure is explicit") &&
            expect(scene.is_display_capture_active(), "the previous display remains active after add failure") &&
@@ -339,13 +339,28 @@ bool display_capture_replacement_is_rejected_while_recording()
     fake_scene_backend backend;
     main_scene_subsystem scene(backend);
     scene.create(true, true, 1280, 720);
-    scene.configure_display_capture("display-1", true, "display-1", 0, true, false);
+    scene.configure_display_capture("display-1", true, "display-1", 0, true, false, false);
 
-    const auto result = scene.configure_display_capture("display-2", true, "display-2", 0, true, true);
+    const auto result = scene.configure_display_capture("display-2", true, "display-2", 0, true, true, false);
 
     return expect(result.code == CASTOR_ENGINE_DISPLAY_RECONFIGURATION_WHILE_RECORDING,
                   "replacement while recording is explicit") &&
            expect(backend.display_source_creations == 1, "no replacement source is created while recording") &&
+           expect(scene.is_display_capture_active(), "the existing display source remains active");
+}
+
+bool display_capture_replacement_is_rejected_while_streaming()
+{
+    fake_scene_backend backend;
+    main_scene_subsystem scene(backend);
+    scene.create(true, true, 1280, 720);
+    scene.configure_display_capture("display-1", true, "display-1", 0, true, false, false);
+
+    const auto result = scene.configure_display_capture("display-2", true, "display-2", 0, true, false, true);
+
+    return expect(result.code == CASTOR_ENGINE_DISPLAY_RECONFIGURATION_WHILE_STREAMING,
+                  "replacement while streaming is explicit") &&
+           expect(backend.display_source_creations == 1, "no replacement source is created while streaming") &&
            expect(scene.is_display_capture_active(), "the existing display source remains active");
 }
 
@@ -374,6 +389,8 @@ int main()
          display_capture_add_failure_releases_only_the_replacement},
         {"display_capture_replacement_is_rejected_while_recording",
          display_capture_replacement_is_rejected_while_recording},
+        {"display_capture_replacement_is_rejected_while_streaming",
+         display_capture_replacement_is_rejected_while_streaming},
     };
 
     uint32_t failures = 0;

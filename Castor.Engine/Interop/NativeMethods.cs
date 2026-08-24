@@ -56,6 +56,29 @@ namespace Castor.Engine.Interop
         DisplaySourceAddFailed = 41,
         DisplayNoActiveScene = 42,
         DisplayReconfigurationWhileRecording = 43,
+
+        StreamingInvalidConfiguration = 44,
+        StreamingNotConfigured = 45,
+        StreamingServiceUnavailable = 46,
+        StreamingOutputUnavailable = 47,
+        StreamingServiceCreationFailed = 48,
+        StreamingOutputCreationFailed = 49,
+        StreamingEncodersNotConfigured = 50,
+        StreamingNoActiveScene = 51,
+        StreamingAlreadyActive = 52,
+        StreamingNotActive = 53,
+        StreamingReconfigurationWhileActive = 54,
+        StreamingConflictingOutputActive = 55,
+        StreamingStartFailed = 56,
+        StreamingConnectionFailed = 57,
+        StreamingStreamRejected = 58,
+        StreamingDisconnected = 59,
+        StreamingReconnectExhausted = 60,
+        StreamingUnsupported = 61,
+        StreamingEncoderError = 62,
+        StreamingStopTimeout = 63,
+        StreamingOutputError = 64,
+        DisplayReconfigurationWhileStreaming = 65,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -116,6 +139,36 @@ namespace Castor.Engine.Interop
     {
         internal uint StructSize;
         internal nint DestinationPath;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineStreamingConfiguration
+    {
+        internal uint StructSize;
+        internal nint ServerUrl;
+        internal nint StreamKey;
+        internal byte UseAuthentication;
+        internal nint Username;
+        internal nint Password;
+        internal uint ReconnectRetryCount;
+        internal uint ReconnectDelaySeconds;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineStreamingStatus
+    {
+        internal uint StructSize;
+        internal uint State;
+        internal uint LastFailureCode;
+        internal FixedBuffer512 LastFailureMessage;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineStreamingHealth
+    {
+        internal uint StructSize;
+        internal ulong TotalFrames;
+        internal ulong DroppedFrames;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -354,6 +407,39 @@ namespace Castor.Engine.Interop
             EntryPoint = "castor_engine_is_recording_active")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial byte IsRecordingActive();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_configure_streaming")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult ConfigureStreaming(
+            in NativeEngineStreamingConfiguration configuration);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_start_streaming")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult StartStreaming();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_stop_streaming")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult StopStreaming();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_streaming_status")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult GetStreamingStatus(
+            ref NativeEngineStreamingStatus status);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_streaming_health")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult GetStreamingHealth(
+            ref NativeEngineStreamingHealth health);
 
         [LibraryImport(
             LibraryName,

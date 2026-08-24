@@ -17,7 +17,7 @@ extern "C"
 {
 #endif
 
-#define CASTOR_ENGINE_ABI_VERSION 10
+#define CASTOR_ENGINE_ABI_VERSION 11
 #define CASTOR_ENGINE_VERSION "0.1.0-alpha.1"
 
     CASTOR_ENGINE_API uint32_t castor_engine_get_abi_version(void);
@@ -79,7 +79,40 @@ extern "C"
         CASTOR_ENGINE_DISPLAY_SOURCE_ADD_FAILED = 41,
         CASTOR_ENGINE_DISPLAY_NO_ACTIVE_SCENE = 42,
         CASTOR_ENGINE_DISPLAY_RECONFIGURATION_WHILE_RECORDING = 43,
+
+        CASTOR_ENGINE_STREAMING_INVALID_CONFIGURATION = 44,
+        CASTOR_ENGINE_STREAMING_NOT_CONFIGURED = 45,
+        CASTOR_ENGINE_STREAMING_SERVICE_UNAVAILABLE = 46,
+        CASTOR_ENGINE_STREAMING_OUTPUT_UNAVAILABLE = 47,
+        CASTOR_ENGINE_STREAMING_SERVICE_CREATION_FAILED = 48,
+        CASTOR_ENGINE_STREAMING_OUTPUT_CREATION_FAILED = 49,
+        CASTOR_ENGINE_STREAMING_ENCODERS_NOT_CONFIGURED = 50,
+        CASTOR_ENGINE_STREAMING_NO_ACTIVE_SCENE = 51,
+        CASTOR_ENGINE_STREAMING_ALREADY_ACTIVE = 52,
+        CASTOR_ENGINE_STREAMING_NOT_ACTIVE = 53,
+        CASTOR_ENGINE_STREAMING_RECONFIGURATION_WHILE_ACTIVE = 54,
+        CASTOR_ENGINE_STREAMING_CONFLICTING_OUTPUT_ACTIVE = 55,
+        CASTOR_ENGINE_STREAMING_START_FAILED = 56,
+        CASTOR_ENGINE_STREAMING_CONNECTION_FAILED = 57,
+        CASTOR_ENGINE_STREAMING_STREAM_REJECTED = 58,
+        CASTOR_ENGINE_STREAMING_DISCONNECTED = 59,
+        CASTOR_ENGINE_STREAMING_RECONNECT_EXHAUSTED = 60,
+        CASTOR_ENGINE_STREAMING_UNSUPPORTED = 61,
+        CASTOR_ENGINE_STREAMING_ENCODER_ERROR = 62,
+        CASTOR_ENGINE_STREAMING_STOP_TIMEOUT = 63,
+        CASTOR_ENGINE_STREAMING_OUTPUT_ERROR = 64,
+        CASTOR_ENGINE_DISPLAY_RECONFIGURATION_WHILE_STREAMING = 65,
     } castor_engine_result_t;
+
+    typedef enum castor_engine_streaming_state
+    {
+        CASTOR_ENGINE_STREAMING_IDLE = 0,
+        CASTOR_ENGINE_STREAMING_CONNECTING = 1,
+        CASTOR_ENGINE_STREAMING_LIVE = 2,
+        CASTOR_ENGINE_STREAMING_RECONNECTING = 3,
+        CASTOR_ENGINE_STREAMING_STOPPING = 4,
+        CASTOR_ENGINE_STREAMING_FAILED = 5,
+    } castor_engine_streaming_state_t;
 
     typedef enum castor_engine_speaker_layout
     {
@@ -412,6 +445,36 @@ extern "C"
         const char* destination_path;
     } castor_engine_recording_config_t;
 
+    /** A versioned, single-destination RTMP streaming configuration. */
+    typedef struct castor_engine_streaming_config
+    {
+        uint32_t struct_size;
+        const char* server_url;
+        const char* stream_key;
+        uint8_t use_authentication;
+        const char* username;
+        const char* password;
+        uint32_t reconnect_retry_count;
+        uint32_t reconnect_delay_seconds;
+    } castor_engine_streaming_config_t;
+
+    /** A snapshot of the asynchronous streaming state and last failure. */
+    typedef struct castor_engine_streaming_status
+    {
+        uint32_t struct_size;
+        uint32_t state;
+        uint32_t last_failure_code;
+        char last_failure_message[512];
+    } castor_engine_streaming_status_t;
+
+    /** Network delivery counters for the current streaming session. */
+    typedef struct castor_engine_streaming_health
+    {
+        uint32_t struct_size;
+        uint64_t total_frames;
+        uint64_t dropped_frames;
+    } castor_engine_streaming_health_t;
+
     /**
      * Validates a recording configuration in isolation. This does not
      * require the engine or OBS to be initialized and does not start a
@@ -447,6 +510,22 @@ extern "C"
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_stop_recording(void);
 
     CASTOR_ENGINE_API uint8_t castor_engine_is_recording_active(void);
+
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_validate_streaming_config(const castor_engine_streaming_config_t* config);
+
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_configure_streaming(const castor_engine_streaming_config_t* config);
+
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_start_streaming(void);
+
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_stop_streaming(void);
+
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_get_streaming_status(castor_engine_streaming_status_t* out_status);
+
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_get_streaming_health(castor_engine_streaming_health_t* out_health);
 
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_create_main_scene(void);
 
