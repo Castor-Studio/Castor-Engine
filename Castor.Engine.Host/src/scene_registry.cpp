@@ -34,8 +34,8 @@ scene_registry_subsystem::scene_entry* scene_registry_subsystem::find(const char
         return nullptr;
     }
 
-    auto it = std::find_if(scenes_.begin(), scenes_.end(), [name](const scene_entry& entry)
-                           { return entry.name == name; });
+    auto it =
+        std::find_if(scenes_.begin(), scenes_.end(), [name](const scene_entry& entry) { return entry.name == name; });
     return it == scenes_.end() ? nullptr : &(*it);
 }
 
@@ -46,8 +46,8 @@ const scene_registry_subsystem::scene_entry* scene_registry_subsystem::find(cons
         return nullptr;
     }
 
-    auto it = std::find_if(scenes_.begin(), scenes_.end(), [name](const scene_entry& entry)
-                           { return entry.name == name; });
+    auto it =
+        std::find_if(scenes_.begin(), scenes_.end(), [name](const scene_entry& entry) { return entry.name == name; });
     return it == scenes_.end() ? nullptr : &(*it);
 }
 
@@ -95,8 +95,7 @@ scene_registry_result scene_registry_subsystem::create_scene(const char* name, b
 
     if (find(name) != nullptr)
     {
-        return failure(CASTOR_ENGINE_SCENE_ALREADY_EXISTS,
-                       "A scene named '" + std::string(name) + "' already exists.");
+        return failure(CASTOR_ENGINE_SCENE_ALREADY_EXISTS, "A scene named '" + std::string(name) + "' already exists.");
     }
 
     void* scene = backend_.create_scene(name);
@@ -133,7 +132,7 @@ scene_registry_result scene_registry_subsystem::delete_scene(const char* name)
 
     scenes_.erase(std::remove_if(scenes_.begin(), scenes_.end(),
                                  [name](const scene_entry& candidate) { return candidate.name == name; }),
-                 scenes_.end());
+                  scenes_.end());
     return {CASTOR_ENGINE_OK, {}};
 }
 
@@ -270,8 +269,8 @@ bool scene_registry_subsystem::is_display_capture_active(const char* scene_name)
 }
 
 scene_registry_result scene_registry_subsystem::switch_scene(const char* name,
-                                                              const castor_engine_scene_transition_config_t& transition,
-                                                              bool video_ready, uint32_t width, uint32_t height)
+                                                             const castor_engine_scene_transition_config_t& transition,
+                                                             bool video_ready, uint32_t width, uint32_t height)
 {
     if (is_blank(name))
     {

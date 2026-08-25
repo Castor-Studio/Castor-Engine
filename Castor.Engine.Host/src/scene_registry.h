@@ -65,9 +65,9 @@ class scene_registry_subsystem final
     bool scene_exists(const char* name) const noexcept;
 
     scene_registry_result configure_display_capture(const char* scene_name, const char* display_id,
-                                                     bool uses_string_selector, const char* obs_monitor_id,
-                                                     long long obs_monitor_index, bool capture_cursor,
-                                                     bool recording_active, bool streaming_active);
+                                                    bool uses_string_selector, const char* obs_monitor_id,
+                                                    long long obs_monitor_index, bool capture_cursor,
+                                                    bool recording_active, bool streaming_active);
     bool is_display_capture_active(const char* scene_name) const noexcept;
 
     scene_registry_result switch_scene(const char* name, const castor_engine_scene_transition_config_t& transition,

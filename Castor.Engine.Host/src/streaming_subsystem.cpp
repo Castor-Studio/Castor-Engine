@@ -142,8 +142,7 @@ streaming_lifecycle_result streaming_subsystem::start(bool runtime_ready, bool v
     }
     if (!scene_active)
     {
-        return failure(CASTOR_ENGINE_STREAMING_NO_ACTIVE_SCENE,
-                       "A scene must be active before streaming can start.");
+        return failure(CASTOR_ENGINE_STREAMING_NO_ACTIVE_SCENE, "A scene must be active before streaming can start.");
     }
     if (recording_active)
     {

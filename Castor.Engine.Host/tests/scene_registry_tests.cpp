@@ -10,8 +10,8 @@
 
 namespace
 {
-using castor::engine::detail::scene_registry_subsystem;
 using castor::engine::detail::scene_backend;
+using castor::engine::detail::scene_registry_subsystem;
 
 class fake_scene_backend final : public scene_backend
 {
@@ -210,7 +210,7 @@ class fake_scene_backend final : public scene_backend
 };
 
 castor_engine_scene_transition_config_t make_transition(castor_engine_scene_transition_type_t type,
-                                                         uint32_t duration_ms)
+                                                        uint32_t duration_ms)
 {
     return {static_cast<uint32_t>(sizeof(castor_engine_scene_transition_config_t)), static_cast<uint32_t>(type),
             duration_ms};
@@ -370,8 +370,8 @@ bool first_switch_binds_directly_without_transition()
     scene_registry_subsystem registry(backend);
     registry.create_scene("wide", true);
 
-    const auto result = registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500), true,
-                                              1280, 720);
+    const auto result =
+        registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500), true, 1280, 720);
     std::string active;
 
     return expect(result.code == CASTOR_ENGINE_OK, "the first switch succeeds") &&
@@ -404,8 +404,8 @@ bool switch_to_active_scene_is_noop()
     registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_CUT, 0), true, 1280, 720);
     const uint32_t calls_before = backend.set_output_calls;
 
-    const auto result = registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500), true,
-                                              1280, 720);
+    const auto result =
+        registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500), true, 1280, 720);
 
     return expect(result.code == CASTOR_ENGINE_OK, "switching to the active scene is a no-op") &&
            expect(backend.set_output_calls == calls_before, "no additional backend call is made") &&
@@ -438,8 +438,8 @@ bool fade_switch_uses_transition_backend()
     registry.create_scene("closeup", true);
     registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_CUT, 0), true, 1280, 720);
 
-    const auto result = registry.switch_scene("closeup", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 750),
-                                              true, 1280, 720);
+    const auto result =
+        registry.switch_scene("closeup", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 750), true, 1280, 720);
     std::string active;
 
     return expect(result.code == CASTOR_ENGINE_OK, "a fade switch succeeds") &&
@@ -479,8 +479,8 @@ bool cut_between_same_type_transitions_reseeds_instead_of_reusing_directly()
     registry.switch_scene("closeup", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500), true, 1280, 720);
     registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_CUT, 0), true, 1280, 720);
 
-    const auto result = registry.switch_scene("halftime", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500),
-                                              true, 1280, 720);
+    const auto result =
+        registry.switch_scene("halftime", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500), true, 1280, 720);
 
     return expect(result.code == CASTOR_ENGINE_OK, "fading again after an intervening cut succeeds") &&
            expect(backend.transition_creations == 1, "the same-type transition object is reused, not recreated") &&
@@ -502,8 +502,7 @@ bool switching_between_different_types_reseeds_transition()
 
     return expect(backend.transition_creations == 2, "a different transition type creates a new transition object") &&
            expect(backend.transition_releases == 1, "the previous transition object is released") &&
-           expect(backend.seed_calls == 2,
-                  "both the fade-after-cut and the type change seed rather than swap") &&
+           expect(backend.seed_calls == 2, "both the fade-after-cut and the type change seed rather than swap") &&
            expect(backend.last_transition_type == CASTOR_ENGINE_SCENE_TRANSITION_SLIDE,
                   "the newly requested type reaches the backend");
 }
@@ -517,8 +516,8 @@ bool transition_unavailable_is_reported()
     registry.create_scene("closeup", true);
     registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_CUT, 0), true, 1280, 720);
 
-    const auto result = registry.switch_scene("closeup", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_SWIPE, 500),
-                                              true, 1280, 720);
+    const auto result =
+        registry.switch_scene("closeup", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_SWIPE, 500), true, 1280, 720);
     std::string active;
 
     return expect(result.code == CASTOR_ENGINE_SCENE_TRANSITION_UNAVAILABLE, "an unavailable type is explicit") &&
@@ -534,8 +533,8 @@ bool transition_creation_failure_is_reported()
     registry.create_scene("closeup", true);
     registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_CUT, 0), true, 1280, 720);
 
-    const auto result = registry.switch_scene("closeup", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500),
-                                              true, 1280, 720);
+    const auto result =
+        registry.switch_scene("closeup", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500), true, 1280, 720);
     std::string active;
 
     return expect(result.code == CASTOR_ENGINE_SCENE_TRANSITION_CREATION_FAILED,
@@ -552,8 +551,8 @@ bool transition_start_failure_is_reported_and_state_unchanged()
     registry.create_scene("closeup", true);
     registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_CUT, 0), true, 1280, 720);
 
-    const auto result = registry.switch_scene("closeup", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500),
-                                              true, 1280, 720);
+    const auto result =
+        registry.switch_scene("closeup", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500), true, 1280, 720);
     std::string active;
 
     return expect(result.code == CASTOR_ENGINE_SCENE_TRANSITION_START_FAILED,

@@ -583,8 +583,7 @@ extern "C"
      * is out of range or the buffer is too small for the name plus a null
      * terminator.
      */
-    CASTOR_ENGINE_API uint8_t castor_engine_get_scene_name_at(uint32_t index, char* out_name,
-                                                              uint32_t out_name_size);
+    CASTOR_ENGINE_API uint8_t castor_engine_get_scene_name_at(uint32_t index, char* out_name, uint32_t out_name_size);
 
     /**
      * Retrieves the name of the currently active scene. Returns 0 and
