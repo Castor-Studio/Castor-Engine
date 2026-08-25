@@ -49,8 +49,9 @@ namespace Castor.Engine.Tests
                     framesPerSecondNumerator: 30,
                     framesPerSecondDenominator: 1));
 
-            // 3. Create the default scene.
-            EngineRuntime.CreateMainScene();
+            // 3. Create and activate a scene.
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
 
             // 4. Start a short recording. The video encoder, the audio
             // subsystem, and the AAC audio encoder are all configured
@@ -100,7 +101,8 @@ namespace Castor.Engine.Tests
             EngineRuntime.Initialize(new EngineRuntimeConfiguration(AppContext.BaseDirectory));
             EngineRuntime.ConfigureVideo(
                 new EngineVideoConfiguration(1280, 720, 1280, 720, 30, 1));
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
 
             var displays = EngineRuntime.EnumerateDisplays();
 
@@ -112,15 +114,15 @@ namespace Castor.Engine.Tests
 
             var selectedDisplay = displays.FirstOrDefault(display => display.IsPrimary) ?? displays[0];
             EngineRuntime.ConfigureDisplayCapture(
-                new EngineDisplayCaptureConfiguration(selectedDisplay.Id, captureCursor: true));
-            Assert.True(EngineRuntime.IsDisplayCaptureActive);
+                new EngineDisplayCaptureConfiguration("wide", selectedDisplay.Id, captureCursor: true));
+            Assert.True(EngineRuntime.IsDisplayCaptureActive("wide"));
 
             EngineRuntime.StartRecording(new EngineRecordingConfiguration(path));
             Assert.True(EngineRuntime.IsRecordingActive);
 
             var replacementException = Assert.Throws<InvalidOperationException>(
                 () => EngineRuntime.ConfigureDisplayCapture(
-                    new EngineDisplayCaptureConfiguration(selectedDisplay.Id, captureCursor: false)));
+                    new EngineDisplayCaptureConfiguration("wide", selectedDisplay.Id, captureCursor: false)));
             Assert.Contains("DisplayReconfigurationWhileRecording", replacementException.Message);
 
             Thread.Sleep(500);

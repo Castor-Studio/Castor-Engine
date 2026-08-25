@@ -91,7 +91,8 @@ namespace Castor.Engine.Tests
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
             Assert.False(NativeVideoEncoderMethods.IsVideoEncoderConfigured() != 0);
             Assert.False(NativeVideoEncoderMethods.IsAudioEncoderConfigured() != 0);
 
@@ -128,7 +129,8 @@ namespace Castor.Engine.Tests
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
             NativeVideoEncoderMethods.ConfigureVideoEncoder(
                 NativeVideoEncoderMethods.CreateConfig(
                     selectionMode: NativeVideoEncoderMethods.HardwarePreferredSelectionMode));
@@ -161,7 +163,8 @@ namespace Castor.Engine.Tests
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
             var firstConfig = NativeRecordingMethods.CreateConfig(CreateTempMkvPath("first.mkv"));
             var secondConfig = NativeRecordingMethods.CreateConfig(CreateTempMkvPath("second.mkv"));
 
@@ -196,7 +199,8 @@ namespace Castor.Engine.Tests
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
             var firstPath = CreateTempMkvPath("first.mkv");
             var secondPath = CreateTempMkvPath("second.mkv");
             var firstConfig = NativeRecordingMethods.CreateConfig(firstPath);
@@ -233,7 +237,8 @@ namespace Castor.Engine.Tests
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
             var path = CreateTempMkvPath();
             var config = NativeRecordingMethods.CreateConfig(path);
 
@@ -267,7 +272,9 @@ namespace Castor.Engine.Tests
             {
                 EngineRuntime.Initialize(runtimeConfiguration);
                 EngineRuntime.ConfigureVideo(videoConfiguration);
-                EngineRuntime.CreateMainScene();
+                EngineRuntime.CreateScene("wide");
+                EngineRuntime.SwitchScene(
+                    "wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
 
                 var path = CreateTempMkvPath(fileName);
                 var config = NativeRecordingMethods.CreateConfig(path);

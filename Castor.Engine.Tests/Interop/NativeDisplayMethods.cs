@@ -16,10 +16,17 @@ namespace Castor.Engine.Tests.Interop
         DisplaySourceAddFailed = 41,
         DisplayNoActiveScene = 42,
         DisplayReconfigurationWhileRecording = 43,
+        SceneNotFound = 68,
     }
 
     [InlineArray(256)]
     internal struct NativeDisplayBuffer256
+    {
+        private byte _element0;
+    }
+
+    [InlineArray(128)]
+    internal struct NativeDisplayBuffer128
     {
         private byte _element0;
     }
@@ -37,6 +44,7 @@ namespace Castor.Engine.Tests.Interop
     internal struct NativeDisplayCaptureConfig
     {
         internal uint StructSize;
+        internal NativeDisplayBuffer128 SceneName;
         internal NativeDisplayBuffer256 DisplayId;
         internal byte CaptureCursor;
     }
@@ -91,15 +99,23 @@ namespace Castor.Engine.Tests.Interop
             LibraryName,
             EntryPoint = "castor_engine_is_display_capture_active",
             CallingConvention = CallingConvention.Cdecl)]
-        internal static extern byte IsDisplayCaptureActive();
+        internal static extern byte IsDisplayCaptureActive([MarshalAs(UnmanagedType.LPUTF8Str)] string sceneName);
 
-        internal static NativeDisplayCaptureConfig CreateConfig(string displayId, bool captureCursor = true)
+        [DllImport(
+            LibraryName,
+            EntryPoint = "castor_engine_create_scene",
+            CallingConvention = CallingConvention.Cdecl)]
+        internal static extern NativeDisplayResult CreateScene([MarshalAs(UnmanagedType.LPUTF8Str)] string sceneName);
+
+        internal static NativeDisplayCaptureConfig CreateConfig(string sceneName, string displayId,
+                                                                 bool captureCursor = true)
         {
             var config = new NativeDisplayCaptureConfig
             {
                 StructSize = checked((uint)Marshal.SizeOf<NativeDisplayCaptureConfig>()),
                 CaptureCursor = captureCursor ? (byte)1 : (byte)0,
             };
+            Encode(sceneName, config.SceneName);
             Encode(displayId, config.DisplayId);
             return config;
         }

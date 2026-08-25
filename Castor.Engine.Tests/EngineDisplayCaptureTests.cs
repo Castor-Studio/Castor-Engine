@@ -34,7 +34,7 @@ namespace Castor.Engine.Tests
         {
             var exception = Assert.Throws<InvalidOperationException>(
                 () => EngineRuntime.ConfigureDisplayCapture(
-                    new EngineDisplayCaptureConfiguration("display-1")));
+                    new EngineDisplayCaptureConfiguration("wide", "display-1")));
 
             Assert.Contains("NotInitialized", exception.Message);
         }
@@ -46,22 +46,22 @@ namespace Castor.Engine.Tests
 
             var exception = Assert.Throws<InvalidOperationException>(
                 () => EngineRuntime.ConfigureDisplayCapture(
-                    new EngineDisplayCaptureConfiguration("display-1")));
+                    new EngineDisplayCaptureConfiguration("wide", "display-1")));
 
             Assert.Contains("VideoNotConfigured", exception.Message);
         }
 
         [StaFact]
-        public void ConfigureDisplayCaptureShouldRequireActiveScene()
+        public void ConfigureDisplayCaptureShouldRequireExistingScene()
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
 
             var exception = Assert.Throws<InvalidOperationException>(
                 () => EngineRuntime.ConfigureDisplayCapture(
-                    new EngineDisplayCaptureConfiguration("display-1")));
+                    new EngineDisplayCaptureConfiguration("wide", "display-1")));
 
-            Assert.Contains("DisplayNoActiveScene", exception.Message);
+            Assert.Contains("SceneNotFound", exception.Message);
         }
 
         [StaFact]
@@ -69,14 +69,14 @@ namespace Castor.Engine.Tests
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
 
             var exception = Assert.Throws<InvalidOperationException>(
                 () => EngineRuntime.ConfigureDisplayCapture(
-                    new EngineDisplayCaptureConfiguration("castor-missing-display")));
+                    new EngineDisplayCaptureConfiguration("wide", "castor-missing-display")));
 
             Assert.Contains("DisplayNotFound", exception.Message);
-            Assert.False(EngineRuntime.IsDisplayCaptureActive);
+            Assert.False(EngineRuntime.IsDisplayCaptureActive("wide"));
         }
 
         [StaFact]
@@ -123,7 +123,7 @@ namespace Castor.Engine.Tests
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
             var displays = EngineRuntime.EnumerateDisplays();
 
             if (displays.Count == 0)
@@ -131,25 +131,25 @@ namespace Castor.Engine.Tests
                 return;
             }
 
-            var configuration = new EngineDisplayCaptureConfiguration(displays[0].Id, captureCursor: false);
+            var configuration = new EngineDisplayCaptureConfiguration("wide", displays[0].Id, captureCursor: false);
             EngineRuntime.ConfigureDisplayCapture(configuration);
             EngineRuntime.ConfigureDisplayCapture(configuration);
             EngineRuntime.ConfigureDisplayCapture(
-                new EngineDisplayCaptureConfiguration(displays[0].Id, captureCursor: true));
+                new EngineDisplayCaptureConfiguration("wide", displays[0].Id, captureCursor: true));
 
             if (displays.Count > 1)
             {
                 EngineRuntime.ConfigureDisplayCapture(
-                    new EngineDisplayCaptureConfiguration(displays[1].Id, captureCursor: false));
+                    new EngineDisplayCaptureConfiguration("wide", displays[1].Id, captureCursor: false));
             }
 
-            Assert.True(EngineRuntime.IsDisplayCaptureActive);
-            Assert.NotEqual(0, NativeDisplayMethods.IsDisplayCaptureActive());
+            Assert.True(EngineRuntime.IsDisplayCaptureActive("wide"));
+            Assert.NotEqual(0, NativeDisplayMethods.IsDisplayCaptureActive("wide"));
 
             EngineRuntime.Shutdown();
 
-            Assert.False(EngineRuntime.IsDisplayCaptureActive);
-            Assert.Equal(0, NativeDisplayMethods.IsDisplayCaptureActive());
+            Assert.False(EngineRuntime.IsDisplayCaptureActive("wide"));
+            Assert.Equal(0, NativeDisplayMethods.IsDisplayCaptureActive("wide"));
         }
 
         [StaFact]
@@ -166,14 +166,14 @@ namespace Castor.Engine.Tests
                 if (displays.Count > 0)
                 {
                     EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-                    EngineRuntime.CreateMainScene();
+                    EngineRuntime.CreateScene("wide");
                     EngineRuntime.ConfigureDisplayCapture(
-                        new EngineDisplayCaptureConfiguration(displays[0].Id));
-                    Assert.True(EngineRuntime.IsDisplayCaptureActive);
+                        new EngineDisplayCaptureConfiguration("wide", displays[0].Id));
+                    Assert.True(EngineRuntime.IsDisplayCaptureActive("wide"));
                 }
 
                 EngineRuntime.Shutdown();
-                Assert.False(EngineRuntime.IsDisplayCaptureActive);
+                Assert.False(EngineRuntime.IsDisplayCaptureActive("wide"));
             }
         }
 
