@@ -3,7 +3,7 @@ add_library(Castor.Engine.Host SHARED
     src/video_configuration.cpp
     src/audio_configuration.cpp
     src/audio_subsystem.cpp
-    src/main_scene.cpp
+    src/scene_registry.cpp
     src/obs_scene_backend.cpp
     src/video_encoder_configuration.cpp
     src/video_encoder_enumeration.cpp
@@ -72,8 +72,8 @@ install(
 )
 
 add_executable(Castor.Engine.Host.Tests
-    tests/main_scene_tests.cpp
-    src/main_scene.cpp
+    tests/scene_registry_tests.cpp
+    src/scene_registry.cpp
 )
 
 target_include_directories(
@@ -89,7 +89,7 @@ target_compile_features(
 )
 
 add_test(
-    NAME Castor.Engine.Host.MainScene
+    NAME Castor.Engine.Host.SceneRegistry
     COMMAND Castor.Engine.Host.Tests
 )
 

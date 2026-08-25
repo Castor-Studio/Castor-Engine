@@ -17,7 +17,7 @@ extern "C"
 {
 #endif
 
-#define CASTOR_ENGINE_ABI_VERSION 11
+#define CASTOR_ENGINE_ABI_VERSION 12
 #define CASTOR_ENGINE_VERSION "0.1.0-alpha.1"
 
     CASTOR_ENGINE_API uint32_t castor_engine_get_abi_version(void);
@@ -102,6 +102,14 @@ extern "C"
         CASTOR_ENGINE_STREAMING_STOP_TIMEOUT = 63,
         CASTOR_ENGINE_STREAMING_OUTPUT_ERROR = 64,
         CASTOR_ENGINE_DISPLAY_RECONFIGURATION_WHILE_STREAMING = 65,
+
+        CASTOR_ENGINE_SCENE_INVALID_NAME = 66,
+        CASTOR_ENGINE_SCENE_ALREADY_EXISTS = 67,
+        CASTOR_ENGINE_SCENE_NOT_FOUND = 68,
+        CASTOR_ENGINE_SCENE_DELETE_ACTIVE_SCENE = 69,
+        CASTOR_ENGINE_SCENE_TRANSITION_UNAVAILABLE = 70,
+        CASTOR_ENGINE_SCENE_TRANSITION_CREATION_FAILED = 71,
+        CASTOR_ENGINE_SCENE_TRANSITION_START_FAILED = 72,
     } castor_engine_result_t;
 
     typedef enum castor_engine_streaming_state
@@ -120,6 +128,14 @@ extern "C"
         CASTOR_ENGINE_SPEAKERS_MONO = 1,
         CASTOR_ENGINE_SPEAKERS_STEREO = 2,
     } castor_engine_speaker_layout_t;
+
+    typedef enum castor_engine_scene_transition_type
+    {
+        CASTOR_ENGINE_SCENE_TRANSITION_CUT = 0,
+        CASTOR_ENGINE_SCENE_TRANSITION_FADE = 1,
+        CASTOR_ENGINE_SCENE_TRANSITION_SLIDE = 2,
+        CASTOR_ENGINE_SCENE_TRANSITION_SWIPE = 3,
+    } castor_engine_scene_transition_type_t;
 
     typedef enum castor_engine_video_encoder_selection_mode
     {
@@ -220,16 +236,29 @@ extern "C"
     } castor_engine_display_info_t;
 
     /**
-     * A versioned request to replace the main scene's current visual source
+     * A versioned request to replace a named scene's current visual source
      * with a capture of the
      * display identified by display_id.
      */
     typedef struct castor_engine_display_capture_config
     {
         uint32_t struct_size;
+        char scene_name[128];
         char display_id[256];
         uint8_t capture_cursor;
     } castor_engine_display_capture_config_t;
+
+    /**
+     * A versioned description of the transition applied when switching the
+     * active scene. duration_ms is ignored for
+     * CASTOR_ENGINE_SCENE_TRANSITION_CUT, which always switches instantly.
+     */
+    typedef struct castor_engine_scene_transition_config
+    {
+        uint32_t struct_size;
+        uint32_t type;
+        uint32_t duration_ms;
+    } castor_engine_scene_transition_config_t;
 
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_initialize(const castor_engine_config_t* config);
 
@@ -262,7 +291,7 @@ extern "C"
     castor_engine_validate_display_capture_config(const castor_engine_display_capture_config_t* config);
 
     /**
-     * Replaces the main scene's current visual source with monitor_capture.
+     * Replaces the named scene's current visual source with monitor_capture.
      * An identical effective
      * configuration is a no-op. A different
      * configuration is rejected while recording.
@@ -270,7 +299,7 @@ extern "C"
     CASTOR_ENGINE_API castor_engine_result_t
     castor_engine_configure_display_capture(const castor_engine_display_capture_config_t* config);
 
-    CASTOR_ENGINE_API uint8_t castor_engine_is_display_capture_active(void);
+    CASTOR_ENGINE_API uint8_t castor_engine_is_display_capture_active(const char* scene_name);
 
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_configure_video(const castor_engine_video_config_t* config);
 
@@ -527,7 +556,54 @@ extern "C"
     CASTOR_ENGINE_API castor_engine_result_t
     castor_engine_get_streaming_health(castor_engine_streaming_health_t* out_health);
 
-    CASTOR_ENGINE_API castor_engine_result_t castor_engine_create_main_scene(void);
+    /** Creates an empty named scene. Scene creation has no fixed count limit. */
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_create_scene(const char* scene_name);
+
+    /**
+     * Deletes a named scene and its owned resources. Rejected with
+     * CASTOR_ENGINE_SCENE_DELETE_ACTIVE_SCENE while the scene is the active
+     * one, and with CASTOR_ENGINE_SCENE_NOT_FOUND for an unknown name.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_delete_scene(const char* scene_name);
+
+    /**
+     * Renames a scene in place. If the scene is currently active, the
+     * tracked active scene name is updated to match. Rejected with
+     * CASTOR_ENGINE_SCENE_NOT_FOUND for an unknown old_name and
+     * CASTOR_ENGINE_SCENE_ALREADY_EXISTS when new_name is already used by a
+     * different scene.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_rename_scene(const char* old_name, const char* new_name);
+
+    CASTOR_ENGINE_API uint32_t castor_engine_get_scene_count(void);
+
+    /**
+     * Retrieves the name of the scene at the given index, in the same order
+     * and count as castor_engine_get_scene_count. Returns 0 when the index
+     * is out of range or the buffer is too small for the name plus a null
+     * terminator.
+     */
+    CASTOR_ENGINE_API uint8_t castor_engine_get_scene_name_at(uint32_t index, char* out_name,
+                                                              uint32_t out_name_size);
+
+    /**
+     * Retrieves the name of the currently active scene. Returns 0 and
+     * leaves out_name untouched when no scene is active or the buffer is
+     * too small.
+     */
+    CASTOR_ENGINE_API uint8_t castor_engine_get_active_scene_name(char* out_name, uint32_t out_name_size);
+
+    /**
+     * Switches the active scene to scene_name, applying the requested
+     * transition. The first switch after engine startup, and every switch
+     * using CASTOR_ENGINE_SCENE_TRANSITION_CUT, binds the target scene
+     * instantly. Any other transition type blocks until OBS has finished
+     * animating it. Switching to the already-active scene is a no-op.
+     * Returns CASTOR_ENGINE_SCENE_NOT_FOUND for an unknown scene_name,
+     * without changing the active scene.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_switch_scene(const char* scene_name, const castor_engine_scene_transition_config_t* transition);
 
     CASTOR_ENGINE_API uint8_t castor_engine_has_active_scene(void);
 
