@@ -513,7 +513,7 @@ extern "C"
     castor_engine_validate_recording_config(const castor_engine_recording_config_t* config);
 
     /**
-     * Starts recording the active main scene to destination_path as an
+     * Starts recording the active scene to destination_path as an
      * MKV file, encoded with the video encoder.
      *
      * If no video encoder is configured yet, one is created automatically
@@ -525,7 +525,7 @@ extern "C"
      * otherwise.
      *
      * Requires the engine to be initialized, the video subsystem to be
-     * configured, and the main scene to be active. Starting while already
+     * configured, and a scene to be active. Starting while already
      * recording is rejected with CASTOR_ENGINE_RECORDING_ALREADY_ACTIVE.
      */
     CASTOR_ENGINE_API castor_engine_result_t

@@ -35,6 +35,7 @@ class fake_scene_backend final : public scene_backend
     uint32_t transition_creations = 0;
     uint32_t transition_releases = 0;
     uint32_t swap_calls = 0;
+    uint32_t seed_calls = 0;
     uint32_t start_transition_calls = 0;
 
     std::string requested_display_id;
@@ -177,6 +178,12 @@ class fake_scene_backend final : public scene_backend
     void swap_transition(void* transition, void*) noexcept override
     {
         ++swap_calls;
+        output_source_ = transition;
+    }
+
+    void seed_transition(void* transition, void*) noexcept override
+    {
+        ++seed_calls;
         output_source_ = transition;
     }
 
@@ -444,7 +451,9 @@ bool fade_switch_uses_transition_backend()
 
     return expect(result.code == CASTOR_ENGINE_OK, "a fade switch succeeds") &&
            expect(backend.transition_creations == 1, "a fade switch creates a transition") &&
-           expect(backend.swap_calls == 1, "a fade switch swaps the transition onto the output") &&
+           expect(backend.seed_calls == 1,
+                  "switching from a directly-bound scene seeds the new transition instead of swapping") &&
+           expect(backend.swap_calls == 0, "no swap happens when there was no prior transition") &&
            expect(backend.start_transition_calls == 1, "a fade switch starts the transition") &&
            expect(backend.last_transition_type == CASTOR_ENGINE_SCENE_TRANSITION_FADE,
                   "the requested transition type reaches the backend") &&
@@ -468,6 +477,26 @@ bool switching_same_type_twice_reuses_transition()
            expect(backend.start_transition_calls == 2, "each switch still starts the transition");
 }
 
+bool cut_between_same_type_transitions_reseeds_instead_of_reusing_directly()
+{
+    fake_scene_backend backend;
+    scene_registry_subsystem registry(backend);
+    registry.create_scene("wide", true);
+    registry.create_scene("closeup", true);
+    registry.create_scene("halftime", true);
+    registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_CUT, 0), true, 1280, 720);
+    registry.switch_scene("closeup", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500), true, 1280, 720);
+    registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_CUT, 0), true, 1280, 720);
+
+    const auto result = registry.switch_scene("halftime", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_FADE, 500),
+                                              true, 1280, 720);
+
+    return expect(result.code == CASTOR_ENGINE_OK, "fading again after an intervening cut succeeds") &&
+           expect(backend.transition_creations == 1, "the same-type transition object is reused, not recreated") &&
+           expect(backend.seed_calls == 2,
+                  "the cached transition is reseeded each time a cut detaches it from the output");
+}
+
 bool switching_between_different_types_swaps_transition()
 {
     fake_scene_backend backend;
@@ -482,6 +511,9 @@ bool switching_between_different_types_swaps_transition()
 
     return expect(backend.transition_creations == 2, "a different transition type creates a new transition object") &&
            expect(backend.transition_releases == 1, "the previous transition object is released") &&
+           expect(backend.seed_calls == 1, "the first fade after a cut seeds rather than swaps") &&
+           expect(backend.swap_calls == 1,
+                  "switching between two active transition types swaps the transition object") &&
            expect(backend.last_transition_type == CASTOR_ENGINE_SCENE_TRANSITION_SLIDE,
                   "the newly requested type reaches the backend");
 }
@@ -620,6 +652,8 @@ int main()
         {"cut_switch_always_binds_directly", cut_switch_always_binds_directly},
         {"fade_switch_uses_transition_backend", fade_switch_uses_transition_backend},
         {"switching_same_type_twice_reuses_transition", switching_same_type_twice_reuses_transition},
+        {"cut_between_same_type_transitions_reseeds_instead_of_reusing_directly",
+         cut_between_same_type_transitions_reseeds_instead_of_reusing_directly},
         {"switching_between_different_types_swaps_transition", switching_between_different_types_swaps_transition},
         {"transition_unavailable_is_reported", transition_unavailable_is_reported},
         {"transition_creation_failure_is_reported", transition_creation_failure_is_reported},

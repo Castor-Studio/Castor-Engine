@@ -239,14 +239,22 @@ void obs_scene_backend::set_transition_size(void* transition, uint32_t width, ui
     obs_transition_set_scale_type(as_source(transition), OBS_TRANSITION_SCALE_ASPECT);
 }
 
-void obs_scene_backend::swap_transition(void* transition, void* previous_output_source) noexcept
+void obs_scene_backend::swap_transition(void* transition, void* previous_transition) noexcept
 {
     obs_source_t* new_transition = as_source(transition);
-    obs_source_t* previous = as_source(previous_output_source);
+    obs_source_t* previous = as_source(previous_transition);
 
     obs_transition_swap_begin(new_transition, previous);
     obs_set_output_source(main_output_channel, new_transition);
     obs_transition_swap_end(new_transition, previous);
+}
+
+void obs_scene_backend::seed_transition(void* transition, void* initial_source) noexcept
+{
+    obs_source_t* new_transition = as_source(transition);
+
+    obs_transition_set(new_transition, as_source(initial_source));
+    obs_set_output_source(main_output_channel, new_transition);
 }
 
 bool obs_scene_backend::start_transition(void* transition, void* target_source, uint32_t duration_ms) noexcept

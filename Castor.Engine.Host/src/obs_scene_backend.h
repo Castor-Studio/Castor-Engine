@@ -29,7 +29,8 @@ class obs_scene_backend final : public scene_backend
     void* create_transition(castor_engine_scene_transition_type_t type) noexcept override;
     void release_transition(void* transition) noexcept override;
     void set_transition_size(void* transition, uint32_t width, uint32_t height) noexcept override;
-    void swap_transition(void* transition, void* previous_output_source) noexcept override;
+    void swap_transition(void* transition, void* previous_transition) noexcept override;
+    void seed_transition(void* transition, void* initial_source) noexcept override;
     bool start_transition(void* transition, void* target_source, uint32_t duration_ms) noexcept override;
 
     void wait_for_deferred_destruction() noexcept override;

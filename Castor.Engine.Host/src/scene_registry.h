@@ -41,7 +41,8 @@ class scene_backend
     virtual void* create_transition(castor_engine_scene_transition_type_t type) noexcept = 0;
     virtual void release_transition(void* transition) noexcept = 0;
     virtual void set_transition_size(void* transition, uint32_t width, uint32_t height) noexcept = 0;
-    virtual void swap_transition(void* transition, void* previous_output_source) noexcept = 0;
+    virtual void swap_transition(void* transition, void* previous_transition) noexcept = 0;
+    virtual void seed_transition(void* transition, void* initial_source) noexcept = 0;
     virtual bool start_transition(void* transition, void* target_source, uint32_t duration_ms) noexcept = 0;
 
     virtual void wait_for_deferred_destruction() noexcept = 0;
@@ -95,6 +96,7 @@ class scene_registry_subsystem final
     void* current_transition_ = nullptr;
     castor_engine_scene_transition_type_t current_transition_type_ = CASTOR_ENGINE_SCENE_TRANSITION_CUT;
     bool has_transition_ = false;
+    bool output_is_transition_ = false;
 
     scene_entry* find(const char* name) noexcept;
     const scene_entry* find(const char* name) const noexcept;

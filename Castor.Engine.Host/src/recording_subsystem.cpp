@@ -66,7 +66,7 @@ recording_lifecycle_result recording_subsystem::start(const castor_engine_record
     if (!scene_active)
     {
         return failure(CASTOR_ENGINE_RECORDING_NO_ACTIVE_SCENE,
-                       "The main scene must be active before recording can start.");
+                       "A scene must be active before recording can start.");
     }
 
     if (active_)

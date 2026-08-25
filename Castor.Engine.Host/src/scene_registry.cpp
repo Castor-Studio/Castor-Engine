@@ -298,6 +298,7 @@ scene_registry_result scene_registry_subsystem::switch_scene(const char* name,
     {
         backend_.set_output_source(target_source);
         active_scene_name_ = target->name;
+        output_is_transition_ = false;
         return {CASTOR_ENGINE_OK, {}};
     }
 
@@ -318,8 +319,23 @@ scene_registry_result scene_registry_subsystem::switch_scene(const char* name,
         }
 
         backend_.set_transition_size(new_transition, width, height);
-        void* previous_output = backend_.get_output_source();
-        backend_.swap_transition(new_transition, previous_output);
+
+        if (output_is_transition_)
+        {
+            // The output already shows a transition of a different type: hand
+            // off between the two transition objects so the currently
+            // displayed frame carries over without a visible hitch.
+            backend_.swap_transition(new_transition, current_transition_);
+        }
+        else
+        {
+            // The output currently shows a scene directly (the very first
+            // switch, or the previous switch was a cut): seed the new
+            // transition with that scene instead of swapping between
+            // transitions, since obs_transition_swap_begin/end require both
+            // sides to already be transitions.
+            backend_.seed_transition(new_transition, backend_.get_output_source());
+        }
 
         if (has_transition_)
         {
@@ -330,6 +346,12 @@ scene_registry_result scene_registry_subsystem::switch_scene(const char* name,
         current_transition_type_ = transition_type;
         has_transition_ = true;
     }
+    else if (!output_is_transition_)
+    {
+        // Same type as last time, but a cut switch since then detached it
+        // from the output: reseed and reattach the cached transition.
+        backend_.seed_transition(current_transition_, backend_.get_output_source());
+    }
 
     if (!backend_.start_transition(current_transition_, target_source, transition.duration_ms))
     {
@@ -337,6 +359,7 @@ scene_registry_result scene_registry_subsystem::switch_scene(const char* name,
     }
 
     active_scene_name_ = target->name;
+    output_is_transition_ = true;
     return {CASTOR_ENGINE_OK, {}};
 }
 
@@ -358,7 +381,7 @@ bool scene_registry_subsystem::active_scene_name(std::string& out_name) const no
 
 void scene_registry_subsystem::reset() noexcept
 {
-    bool released_resources = !scenes_.empty() || has_transition_;
+    const bool released_resources = !scenes_.empty() || has_transition_;
 
     for (scene_entry& entry : scenes_)
     {
@@ -374,13 +397,13 @@ void scene_registry_subsystem::reset() noexcept
         has_transition_ = false;
     }
 
-    backend_.disconnect_output();
-
     if (released_resources)
     {
+        backend_.disconnect_output();
         backend_.wait_for_deferred_destruction();
     }
 
     active_scene_name_.clear();
+    output_is_transition_ = false;
 }
 } // namespace castor::engine::detail
