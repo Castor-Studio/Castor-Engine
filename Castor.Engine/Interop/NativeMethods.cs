@@ -79,6 +79,22 @@ namespace Castor.Engine.Interop
         StreamingStopTimeout = 63,
         StreamingOutputError = 64,
         DisplayReconfigurationWhileStreaming = 65,
+
+        SceneInvalidName = 66,
+        SceneAlreadyExists = 67,
+        SceneNotFound = 68,
+        SceneDeleteActiveScene = 69,
+        SceneTransitionUnavailable = 70,
+        SceneTransitionCreationFailed = 71,
+        SceneTransitionStartFailed = 72,
+    }
+
+    internal enum NativeEngineSceneTransitionType
+    {
+        Cut = 0,
+        Fade = 1,
+        Slide = 2,
+        Swipe = 3,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -184,8 +200,17 @@ namespace Castor.Engine.Interop
     internal struct NativeEngineDisplayCaptureConfiguration
     {
         internal uint StructSize;
+        internal FixedBuffer128 SceneName;
         internal FixedBuffer256 DisplayId;
         internal byte CaptureCursor;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineSceneTransitionConfiguration
+    {
+        internal uint StructSize;
+        internal uint Type;
+        internal uint DurationMs;
     }
 
     internal static partial class NativeMethods
@@ -259,9 +284,10 @@ namespace Castor.Engine.Interop
 
         [LibraryImport(
             LibraryName,
-            EntryPoint = "castor_engine_is_display_capture_active")]
+            EntryPoint = "castor_engine_is_display_capture_active",
+            StringMarshalling = StringMarshalling.Utf8)]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial byte IsDisplayCaptureActive();
+        internal static partial byte IsDisplayCaptureActive(string sceneName);
 
         [LibraryImport(
             LibraryName,
@@ -443,9 +469,51 @@ namespace Castor.Engine.Interop
 
         [LibraryImport(
             LibraryName,
-            EntryPoint = "castor_engine_create_main_scene")]
+            EntryPoint = "castor_engine_create_scene",
+            StringMarshalling = StringMarshalling.Utf8)]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial NativeEngineResult CreateMainScene();
+        internal static partial NativeEngineResult CreateScene(string sceneName);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_delete_scene",
+            StringMarshalling = StringMarshalling.Utf8)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult DeleteScene(string sceneName);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_rename_scene",
+            StringMarshalling = StringMarshalling.Utf8)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult RenameScene(string oldName, string newName);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_scene_count")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial uint GetSceneCount();
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_scene_name_at")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte GetSceneNameAt(uint index, byte[] outName, uint outNameSize);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_active_scene_name")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte GetActiveSceneName(byte[] outName, uint outNameSize);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_switch_scene",
+            StringMarshalling = StringMarshalling.Utf8)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult SwitchScene(
+            string sceneName,
+            in NativeEngineSceneTransitionConfiguration transition);
 
         [LibraryImport(
             LibraryName,
