@@ -34,7 +34,6 @@ class fake_scene_backend final : public scene_backend
     uint32_t set_output_calls = 0;
     uint32_t transition_creations = 0;
     uint32_t transition_releases = 0;
-    uint32_t swap_calls = 0;
     uint32_t seed_calls = 0;
     uint32_t start_transition_calls = 0;
 
@@ -173,12 +172,6 @@ class fake_scene_backend final : public scene_backend
 
     void set_transition_size(void*, uint32_t, uint32_t) noexcept override
     {
-    }
-
-    void swap_transition(void* transition, void*) noexcept override
-    {
-        ++swap_calls;
-        output_source_ = transition;
     }
 
     void seed_transition(void* transition, void*) noexcept override
@@ -451,9 +444,7 @@ bool fade_switch_uses_transition_backend()
 
     return expect(result.code == CASTOR_ENGINE_OK, "a fade switch succeeds") &&
            expect(backend.transition_creations == 1, "a fade switch creates a transition") &&
-           expect(backend.seed_calls == 1,
-                  "switching from a directly-bound scene seeds the new transition instead of swapping") &&
-           expect(backend.swap_calls == 0, "no swap happens when there was no prior transition") &&
+           expect(backend.seed_calls == 1, "switching from a directly-bound scene seeds the new transition") &&
            expect(backend.start_transition_calls == 1, "a fade switch starts the transition") &&
            expect(backend.last_transition_type == CASTOR_ENGINE_SCENE_TRANSITION_FADE,
                   "the requested transition type reaches the backend") &&
@@ -497,7 +488,7 @@ bool cut_between_same_type_transitions_reseeds_instead_of_reusing_directly()
                   "the cached transition is reseeded each time a cut detaches it from the output");
 }
 
-bool switching_between_different_types_swaps_transition()
+bool switching_between_different_types_reseeds_transition()
 {
     fake_scene_backend backend;
     scene_registry_subsystem registry(backend);
@@ -511,9 +502,8 @@ bool switching_between_different_types_swaps_transition()
 
     return expect(backend.transition_creations == 2, "a different transition type creates a new transition object") &&
            expect(backend.transition_releases == 1, "the previous transition object is released") &&
-           expect(backend.seed_calls == 1, "the first fade after a cut seeds rather than swaps") &&
-           expect(backend.swap_calls == 1,
-                  "switching between two active transition types swaps the transition object") &&
+           expect(backend.seed_calls == 2,
+                  "both the fade-after-cut and the type change seed rather than swap") &&
            expect(backend.last_transition_type == CASTOR_ENGINE_SCENE_TRANSITION_SLIDE,
                   "the newly requested type reaches the backend");
 }
@@ -588,6 +578,17 @@ bool configure_display_capture_targets_specific_scene_independent_of_active()
            expect(!registry.is_display_capture_active("wide"), "the active scene is unaffected");
 }
 
+bool scene_exists_reflects_registry_state()
+{
+    fake_scene_backend backend;
+    scene_registry_subsystem registry(backend);
+    registry.create_scene("wide", true);
+
+    return expect(registry.scene_exists("wide"), "an existing scene is reported") &&
+           expect(!registry.scene_exists("ghost"), "an unknown scene is not reported") &&
+           expect(!registry.scene_exists(nullptr), "a null name is not reported");
+}
+
 bool configure_display_capture_unknown_scene_is_not_found()
 {
     fake_scene_backend backend;
@@ -654,13 +655,14 @@ int main()
         {"switching_same_type_twice_reuses_transition", switching_same_type_twice_reuses_transition},
         {"cut_between_same_type_transitions_reseeds_instead_of_reusing_directly",
          cut_between_same_type_transitions_reseeds_instead_of_reusing_directly},
-        {"switching_between_different_types_swaps_transition", switching_between_different_types_swaps_transition},
+        {"switching_between_different_types_reseeds_transition", switching_between_different_types_reseeds_transition},
         {"transition_unavailable_is_reported", transition_unavailable_is_reported},
         {"transition_creation_failure_is_reported", transition_creation_failure_is_reported},
         {"transition_start_failure_is_reported_and_state_unchanged",
          transition_start_failure_is_reported_and_state_unchanged},
         {"configure_display_capture_targets_specific_scene_independent_of_active",
          configure_display_capture_targets_specific_scene_independent_of_active},
+        {"scene_exists_reflects_registry_state", scene_exists_reflects_registry_state},
         {"configure_display_capture_unknown_scene_is_not_found", configure_display_capture_unknown_scene_is_not_found},
         {"reset_tears_down_everything_and_permits_restart", reset_tears_down_everything_and_permits_restart},
     };

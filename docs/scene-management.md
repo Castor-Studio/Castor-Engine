@@ -99,20 +99,22 @@ transition source wrapping the handoff between scenes:
   transition object for the requested type is created once and cached;
   later switches reuse it as long as the requested type is unchanged and it
   is still attached to the output.
-  - If the output currently holds a scene directly (the first transition
-    switch, or the switch right after a `Cut`), the new transition is
-    seeded with that scene (`obs_transition_set`) and attached to the
-    output channel, since `obs_transition_swap_begin`/`_end` require both
-    sides to already be transitions.
-  - If the output already holds a *different* transition type, the engine
-    hands off between the two transition objects with
-    `obs_transition_swap_begin`/`obs_set_output_source`/`obs_transition_swap_end`
-    - the standard OBS technique for changing transition type without a
-    visible hitch - and releases the old one.
-  - Either way, `obs_transition_start` then animates to the target scene,
-    and the call blocks on the transition's `transition_stop` signal until
-    OBS finishes, mirroring the deferred-destruction barrier already used
-    elsewhere in this engine.
+  - Whenever a (re)attach is needed - the first transition switch, the
+    switch right after a `Cut`, or a change of transition type - the new
+    or cached transition is seeded with whatever is currently on the
+    output channel (`obs_transition_set`) and attached
+    (`obs_set_output_source`). A transition switching every prior switch
+    always fully completes before the next one starts, so there is never
+    an in-flight animation to preserve, which is also why this engine does
+    not use `obs_transition_swap_begin`/`_end`: that pair snaps the
+    transition straight to its resting state instead of leaving it ready
+    to animate, so a subsequent `obs_transition_start` on it is rejected.
+  - `obs_transition_start` then animates to the target scene, and the call
+    blocks by polling `obs_transition_get_time` until it reaches `1.0`
+    (fully complete) - transitions have no public completion signal (the
+    `transition_stop` field in `obs_source_info` is a plugin-private
+    callback, never proxied to the source's signal handler) and
+    `obs_transition_is_active` never clears once a transition has run.
 
 ## Failure handling and diagnostics
 
@@ -129,9 +131,9 @@ transition source wrapping the handoff between scenes:
 ## Automated coverage
 
 Native lifecycle tests use a fake backend (no OBS required) to cover scene
-creation, listing, deletion, renaming, the direct-bind vs. seed vs. swap
-switching paths for every transition type, injected transition failures, and
-full teardown/restart. Managed integration tests exercise the real packaged
+creation, listing, deletion, renaming, the direct-bind vs. seed switching
+paths for every transition type, injected transition failures, and full
+teardown/restart. Managed integration tests exercise the real packaged
 OBS runtime: creating several scenes, switching between them with every
 transition type, and querying the active scene.
 

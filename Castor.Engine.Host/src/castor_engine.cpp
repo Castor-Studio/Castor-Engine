@@ -468,6 +468,12 @@ castor_engine_result_t castor_engine_configure_display_capture(const castor_engi
         return CASTOR_ENGINE_VIDEO_NOT_CONFIGURED;
     }
 
+    if (!scene_registry.scene_exists(config->scene_name))
+    {
+        set_last_error("No scene named '" + std::string(config->scene_name) + "' exists.");
+        return CASTOR_ENGINE_SCENE_NOT_FOUND;
+    }
+
     castor::engine::detail::display_enumeration_result enumeration = castor::engine::detail::enumerate_obs_displays();
 
     if (enumeration.code != CASTOR_ENGINE_OK)

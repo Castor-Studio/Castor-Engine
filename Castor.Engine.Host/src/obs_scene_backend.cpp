@@ -1,9 +1,11 @@
 #include "obs_scene_backend.h"
 
+#include <chrono>
 #include <condition_variable>
 #include <cstring>
 #include <mutex>
 #include <obs.h>
+#include <thread>
 
 namespace castor::engine::detail
 {
@@ -69,24 +71,7 @@ void signal_graphics_barrier(void*)
 {
 }
 
-struct transition_wait_state
-{
-    std::mutex mutex;
-    std::condition_variable completed_condition;
-    bool completed = false;
-};
-
-void signal_transition_stop(void* parameter, calldata_t*)
-{
-    auto* state = static_cast<transition_wait_state*>(parameter);
-
-    {
-        std::scoped_lock lock(state->mutex);
-        state->completed = true;
-    }
-
-    state->completed_condition.notify_one();
-}
+constexpr std::chrono::milliseconds transition_poll_interval{10};
 } // namespace
 
 void* obs_scene_backend::create_scene(const char* name) noexcept
@@ -239,16 +224,6 @@ void obs_scene_backend::set_transition_size(void* transition, uint32_t width, ui
     obs_transition_set_scale_type(as_source(transition), OBS_TRANSITION_SCALE_ASPECT);
 }
 
-void obs_scene_backend::swap_transition(void* transition, void* previous_transition) noexcept
-{
-    obs_source_t* new_transition = as_source(transition);
-    obs_source_t* previous = as_source(previous_transition);
-
-    obs_transition_swap_begin(new_transition, previous);
-    obs_set_output_source(main_output_channel, new_transition);
-    obs_transition_swap_end(new_transition, previous);
-}
-
 void obs_scene_backend::seed_transition(void* transition, void* initial_source) noexcept
 {
     obs_source_t* new_transition = as_source(transition);
@@ -260,30 +235,23 @@ void obs_scene_backend::seed_transition(void* transition, void* initial_source) 
 bool obs_scene_backend::start_transition(void* transition, void* target_source, uint32_t duration_ms) noexcept
 {
     obs_source_t* source = as_source(transition);
-    signal_handler_t* handler = obs_source_get_signal_handler(source);
 
-    if (handler == nullptr)
+    if (!obs_transition_start(source, OBS_TRANSITION_MODE_AUTO, duration_ms, as_source(target_source)))
     {
         return false;
     }
 
-    transition_wait_state state;
-    signal_handler_connect(handler, "transition_stop", signal_transition_stop, &state);
-
-    const bool started =
-        obs_transition_start(source, OBS_TRANSITION_MODE_AUTO, duration_ms, as_source(target_source));
-
-    if (!started)
+    // obs_transition_start only kicks the animation off; there is no public
+    // completion signal for transitions (transition_stop in obs-source.h is
+    // a plugin-private callback, never proxied to the source's signal
+    // handler), and obs_transition_is_active never clears once a transition
+    // has run at all. The video thread advances the normalized transition
+    // time to 1.0 as it ticks, so poll that instead.
+    while (obs_transition_get_time(source) < 1.0F)
     {
-        signal_handler_disconnect(handler, "transition_stop", signal_transition_stop, &state);
-        return false;
+        std::this_thread::sleep_for(transition_poll_interval);
     }
 
-    std::unique_lock lock(state.mutex);
-    state.completed_condition.wait(lock, [&state] { return state.completed; });
-    lock.unlock();
-
-    signal_handler_disconnect(handler, "transition_stop", signal_transition_stop, &state);
     return true;
 }
 

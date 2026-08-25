@@ -41,7 +41,6 @@ class scene_backend
     virtual void* create_transition(castor_engine_scene_transition_type_t type) noexcept = 0;
     virtual void release_transition(void* transition) noexcept = 0;
     virtual void set_transition_size(void* transition, uint32_t width, uint32_t height) noexcept = 0;
-    virtual void swap_transition(void* transition, void* previous_transition) noexcept = 0;
     virtual void seed_transition(void* transition, void* initial_source) noexcept = 0;
     virtual bool start_transition(void* transition, void* target_source, uint32_t duration_ms) noexcept = 0;
 
@@ -63,6 +62,7 @@ class scene_registry_subsystem final
 
     uint32_t scene_count() const noexcept;
     bool scene_name_at(uint32_t index, std::string& out_name) const;
+    bool scene_exists(const char* name) const noexcept;
 
     scene_registry_result configure_display_capture(const char* scene_name, const char* display_id,
                                                      bool uses_string_selector, const char* obs_monitor_id,

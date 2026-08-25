@@ -192,6 +192,11 @@ bool scene_registry_subsystem::scene_name_at(uint32_t index, std::string& out_na
     return true;
 }
 
+bool scene_registry_subsystem::scene_exists(const char* name) const noexcept
+{
+    return find(name) != nullptr;
+}
+
 scene_registry_result scene_registry_subsystem::configure_display_capture(
     const char* scene_name, const char* display_id, bool uses_string_selector, const char* obs_monitor_id,
     long long obs_monitor_index, bool capture_cursor, bool recording_active, bool streaming_active)
@@ -320,22 +325,12 @@ scene_registry_result scene_registry_subsystem::switch_scene(const char* name,
 
         backend_.set_transition_size(new_transition, width, height);
 
-        if (output_is_transition_)
-        {
-            // The output already shows a transition of a different type: hand
-            // off between the two transition objects so the currently
-            // displayed frame carries over without a visible hitch.
-            backend_.swap_transition(new_transition, current_transition_);
-        }
-        else
-        {
-            // The output currently shows a scene directly (the very first
-            // switch, or the previous switch was a cut): seed the new
-            // transition with that scene instead of swapping between
-            // transitions, since obs_transition_swap_begin/end require both
-            // sides to already be transitions.
-            backend_.seed_transition(new_transition, backend_.get_output_source());
-        }
+        // Seed the new transition with whatever is currently on the output
+        // channel - a scene (the first transition switch, or the switch
+        // right after a cut) or a different-typed transition (every prior
+        // switch fully completes before the next one starts, so there is
+        // never an in-flight animation to preserve) - and attach it.
+        backend_.seed_transition(new_transition, backend_.get_output_source());
 
         if (has_transition_)
         {
