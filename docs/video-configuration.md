@@ -36,35 +36,23 @@ through Castor result codes and surfaced as descriptive managed exceptions.
 Calling `EngineRuntime.Shutdown()` clears the configured-video state along
 with the rest of the OBS runtime.
 
-## Default main scene
+## Scenes
 
-After video configuration, the engine can create its default scene and connect
-it to the primary OBS video output:
+After video configuration, the engine can create named scenes and switch the
+active one, connecting it to the primary OBS video output:
 
 ```csharp
-EngineRuntime.CreateMainScene();
+EngineRuntime.CreateScene("wide");
+EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
 
 if (!EngineRuntime.HasActiveScene)
 {
-    throw new InvalidOperationException("The main scene is not active.");
+    throw new InvalidOperationException("No scene is active.");
 }
 ```
 
-The scene and its source remain native implementation details. The public API
-does not expose `obs_scene_t`, `obs_source_t`, or any OBS-owned handle. The
-engine resolves the latest `color_source` implementation supplied by the
-packaged `image-source` module, creates an opaque black source at the configured
-base resolution, adds it to the scene, and verifies that the scene is connected
-to output channel zero.
+Scenes and their sources remain native implementation details. The public API
+does not expose `obs_scene_t`, `obs_source_t`, or any OBS-owned handle.
 
-`CreateMainScene` is idempotent while that scene remains active. Calling it
-before runtime initialization or video configuration produces a diagnostic
-`InvalidOperationException`. Failures during scene, source, item, or output
-creation are rolled back before the diagnostic is returned.
-
-Shutdown first disconnects the scene, then releases the retained source and
-scene references before stopping OBS. The complete initialize, configure,
-create, and shutdown lifecycle can therefore be repeated in the same process.
-
-See [Default OBS Main Scene](main-scene.md) for the public contract, native
+See [Scene Management](scene-management.md) for the public contract, native
 resource lifecycle, diagnostics, and automated coverage.

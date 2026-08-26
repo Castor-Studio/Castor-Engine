@@ -1,10 +1,12 @@
 # Display Capture
 
-Castor Engine ABI version 10 can enumerate the displays exposed by OBS's
-packaged `monitor_capture` source and replace the default scene's solid-color
-source with one selected display. Castor owns the scene item and source for the
-entire lifecycle; no OBS pointer or Windows display handle crosses the public
-API.
+Castor Engine can enumerate the displays exposed by OBS's packaged
+`monitor_capture` source and give a named scene (see
+[Scene Management](scene-management.md)) a display capture as its visual
+source. Castor owns the scene item and source for the entire lifecycle; no
+OBS pointer or Windows display handle crosses the public API. Starting with
+ABI version 12, display capture configuration targets a specific scene by
+name instead of an implicit single scene.
 
 ## Managed API
 
@@ -22,20 +24,26 @@ An empty list is a valid result for a headless or non-interactive session. Each
 `EngineDisplayInfo` contains an opaque identifier, the human-readable label
 provided by OBS, and whether Windows identifies it as the primary display.
 
-After configuring video and creating the main scene, the caller can select one
-of those identifiers:
+After configuring video and creating a scene, the caller can select one of
+those identifiers for that scene:
 
 ```csharp
 EngineRuntime.ConfigureVideo(
     new EngineVideoConfiguration(1280, 720, 1280, 720, 30, 1));
-EngineRuntime.CreateMainScene();
+EngineRuntime.CreateScene("wide");
 
 var selected = displays.First(display => display.IsPrimary);
 EngineRuntime.ConfigureDisplayCapture(
     new EngineDisplayCaptureConfiguration(
+        "wide",
         selected.Id,
         captureCursor: true));
 ```
+
+A scene does not need to be active to be configured this way - preparing a
+background scene's source ahead of a later
+[`SwitchScene`](scene-management.md) call is the normal way to get it ready
+before it goes on air.
 
 The UI that presents this list and persists the user's choice belongs to the
 frontend. The engine only provides enumeration, validation, configuration, and
@@ -70,7 +78,7 @@ Display capture configuration requires, in order:
 
 1. an initialized runtime with loaded OBS modules;
 2. a configured video subsystem;
-3. an active main scene;
+3. a scene with the requested name (it does not need to be the active scene);
 4. a display identifier present in a fresh OBS enumeration.
 
 The first successful configuration creates and adds the display source before
@@ -104,6 +112,10 @@ The C ABI exposes:
 `castor_engine_get_display_count` refreshes the enumeration snapshot. A zero
 count with an empty last-error message means a valid headless environment; a
 non-empty error reports an invalid lifecycle state or unavailable OBS source.
+
+`castor_engine_configure_display_capture` and
+`castor_engine_is_display_capture_active` both take the target scene's name.
+An unknown scene name is rejected with `CASTOR_ENGINE_SCENE_NOT_FOUND`.
 
 ## Scope
 

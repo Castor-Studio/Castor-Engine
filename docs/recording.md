@@ -1,6 +1,6 @@
 # MKV Recording
 
-Castor Engine records the active main scene (see [Default OBS Main Scene](main-scene.md))
+Castor Engine records the active scene (see [Scene Management](scene-management.md))
 to a finalized MKV file, encoded through the [video and audio encoding layer](video-encoder-configuration.md).
 
 ```csharp
@@ -16,7 +16,8 @@ EngineRuntime.ConfigureVideo(
         framesPerSecondNumerator: 30,
         framesPerSecondDenominator: 1));
 
-EngineRuntime.CreateMainScene();
+EngineRuntime.CreateScene("wide");
+EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
 
 EngineRuntime.StartRecording(
     new EngineRecordingConfiguration(@"C:\recordings\output.mkv"));
@@ -103,7 +104,7 @@ fallback) before returning.
 
 - Starting before the engine is initialized returns `CASTOR_ENGINE_NOT_INITIALIZED`.
 - Starting before the video subsystem is configured returns `CASTOR_ENGINE_VIDEO_NOT_CONFIGURED`.
-- Starting before the main scene is active returns `CASTOR_ENGINE_RECORDING_NO_ACTIVE_SCENE`.
+- Starting before a scene is active returns `CASTOR_ENGINE_RECORDING_NO_ACTIVE_SCENE`.
 - Starting while already recording returns `CASTOR_ENGINE_RECORDING_ALREADY_ACTIVE`.
 - Stopping while not recording returns `CASTOR_ENGINE_RECORDING_NOT_ACTIVE`.
 - A second recording can be started once the first has been stopped;

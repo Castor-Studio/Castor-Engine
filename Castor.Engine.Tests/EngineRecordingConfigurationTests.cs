@@ -28,7 +28,8 @@ namespace Castor.Engine.Tests
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
             var path = CreateTempMkvPath();
 
             EngineRuntime.StartRecording(new EngineRecordingConfiguration(path));
@@ -78,7 +79,8 @@ namespace Castor.Engine.Tests
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
             EngineRuntime.StartRecording(new EngineRecordingConfiguration(CreateTempMkvPath("first.mkv")));
 
             var exception = Assert.Throws<InvalidOperationException>(
@@ -103,7 +105,8 @@ namespace Castor.Engine.Tests
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
             EngineRuntime.StartRecording(new EngineRecordingConfiguration(CreateTempMkvPath()));
 
             EngineRuntime.Shutdown();
@@ -117,7 +120,8 @@ namespace Castor.Engine.Tests
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
 
             Assert.Equal(EngineRuntime.IsRecordingActive, NativeRecordingMethods.IsRecordingActive() != 0);
 
@@ -144,9 +148,11 @@ namespace Castor.Engine.Tests
                 // 1. Initialize the engine.
                 EngineRuntime.Initialize(runtimeConfiguration);
 
-                // 2. Configure the video subsystem and the default scene.
+                // 2. Configure the video subsystem and activate a scene.
                 EngineRuntime.ConfigureVideo(videoConfiguration);
-                EngineRuntime.CreateMainScene();
+                EngineRuntime.CreateScene("wide");
+                EngineRuntime.SwitchScene(
+                    "wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
 
                 // 3. Start recording to a fresh destination.
                 var path = CreateTempMkvPath(fileName);

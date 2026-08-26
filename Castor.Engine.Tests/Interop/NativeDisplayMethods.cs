@@ -16,10 +16,17 @@ namespace Castor.Engine.Tests.Interop
         DisplaySourceAddFailed = 41,
         DisplayNoActiveScene = 42,
         DisplayReconfigurationWhileRecording = 43,
+        SceneNotFound = 68,
     }
 
     [InlineArray(256)]
     internal struct NativeDisplayBuffer256
+    {
+        private byte _element0;
+    }
+
+    [InlineArray(128)]
+    internal struct NativeDisplayBuffer128
     {
         private byte _element0;
     }
@@ -37,11 +44,12 @@ namespace Castor.Engine.Tests.Interop
     internal struct NativeDisplayCaptureConfig
     {
         internal uint StructSize;
+        internal NativeDisplayBuffer128 SceneName;
         internal NativeDisplayBuffer256 DisplayId;
         internal byte CaptureCursor;
     }
 
-    internal static class NativeDisplayMethods
+    internal static partial class NativeDisplayMethods
     {
         private const string LibraryName = "Castor.Engine.Host";
 
@@ -87,19 +95,29 @@ namespace Castor.Engine.Tests.Interop
             CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeDisplayResult ConfigureDisplayCapture(in NativeDisplayCaptureConfig config);
 
-        [DllImport(
+        [LibraryImport(
             LibraryName,
             EntryPoint = "castor_engine_is_display_capture_active",
-            CallingConvention = CallingConvention.Cdecl)]
-        internal static extern byte IsDisplayCaptureActive();
+            StringMarshalling = StringMarshalling.Utf8)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte IsDisplayCaptureActive(string sceneName);
 
-        internal static NativeDisplayCaptureConfig CreateConfig(string displayId, bool captureCursor = true)
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_create_scene",
+            StringMarshalling = StringMarshalling.Utf8)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeDisplayResult CreateScene(string sceneName);
+
+        internal static NativeDisplayCaptureConfig CreateConfig(string sceneName, string displayId,
+                                                                 bool captureCursor = true)
         {
             var config = new NativeDisplayCaptureConfig
             {
                 StructSize = checked((uint)Marshal.SizeOf<NativeDisplayCaptureConfig>()),
                 CaptureCursor = captureCursor ? (byte)1 : (byte)0,
             };
+            Encode(sceneName, config.SceneName);
             Encode(displayId, config.DisplayId);
             return config;
         }

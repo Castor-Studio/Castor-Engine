@@ -51,7 +51,8 @@ namespace Castor.Engine.Tests
             EngineRuntime.Initialize(new EngineRuntimeConfiguration(AppContext.BaseDirectory));
             EngineRuntime.ConfigureVideo(new EngineVideoConfiguration(1280, 720, 1280, 720, 30, 1));
             EngineRuntime.ConfigureAudio(new EngineAudioConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
             EngineRuntime.ConfigureVideoEncoder(new EngineVideoEncoderConfiguration(
                 selectionMode: EngineVideoEncoderSelectionMode.SoftwareForced,
                 bitrate: 2500,

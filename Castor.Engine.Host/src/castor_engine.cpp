@@ -5,12 +5,12 @@
 #include "audio_encoder_subsystem.h"
 #include "audio_subsystem.h"
 #include "display_capture_configuration.h"
-#include "main_scene.h"
 #include "obs_display_enumeration.h"
 #include "obs_scene_backend.h"
 #include "obs_streaming_backend.h"
 #include "recording_configuration.h"
 #include "recording_subsystem.h"
+#include "scene_registry.h"
 #include "streaming_configuration.h"
 #include "streaming_subsystem.h"
 #include "video_configuration.h"
@@ -44,7 +44,7 @@ castor::engine::detail::recording_subsystem recording;
 castor::engine::detail::obs_streaming_backend streaming_backend;
 castor::engine::detail::streaming_subsystem streaming(streaming_backend);
 castor::engine::detail::obs_scene_backend scene_backend;
-castor::engine::detail::main_scene_subsystem main_scene(scene_backend);
+castor::engine::detail::scene_registry_subsystem scene_registry(scene_backend);
 
 std::string path_to_utf8(const std::filesystem::path& path)
 {
@@ -177,7 +177,7 @@ void rollback_startup(bool started_here)
     display_snapshot_valid = false;
     recording.reset();
     streaming.reset();
-    main_scene.reset();
+    scene_registry.reset();
     video_encoder.reset();
     audio_encoder.reset();
     video.reset();
@@ -468,10 +468,10 @@ castor_engine_result_t castor_engine_configure_display_capture(const castor_engi
         return CASTOR_ENGINE_VIDEO_NOT_CONFIGURED;
     }
 
-    if (!main_scene.is_active())
+    if (!scene_registry.scene_exists(config->scene_name))
     {
-        set_last_error("The main scene must be active before display capture can be configured.");
-        return CASTOR_ENGINE_DISPLAY_NO_ACTIVE_SCENE;
+        set_last_error("No scene named '" + std::string(config->scene_name) + "' exists.");
+        return CASTOR_ENGINE_SCENE_NOT_FOUND;
     }
 
     castor::engine::detail::display_enumeration_result enumeration = castor::engine::detail::enumerate_obs_displays();
@@ -500,8 +500,8 @@ castor_engine_result_t castor_engine_configure_display_capture(const castor_engi
         return CASTOR_ENGINE_DISPLAY_NOT_FOUND;
     }
 
-    castor::engine::detail::main_scene_result result = main_scene.configure_display_capture(
-        config->display_id, selected->uses_string_selector, selected->obs_monitor_id.c_str(),
+    castor::engine::detail::scene_registry_result result = scene_registry.configure_display_capture(
+        config->scene_name, config->display_id, selected->uses_string_selector, selected->obs_monitor_id.c_str(),
         selected->obs_monitor_index, config->capture_cursor != 0, recording.is_active(), streaming.is_active());
 
     if (result.code != CASTOR_ENGINE_OK)
@@ -512,7 +512,7 @@ castor_engine_result_t castor_engine_configure_display_capture(const castor_engi
     return result.code;
 }
 
-uint8_t castor_engine_is_display_capture_active(void)
+uint8_t castor_engine_is_display_capture_active(const char* scene_name)
 {
     std::scoped_lock lock(lifecycle_mutex);
 
@@ -521,7 +521,7 @@ uint8_t castor_engine_is_display_capture_active(void)
         return 0U;
     }
 
-    return main_scene.is_display_capture_active() ? 1U : 0U;
+    return scene_registry.is_display_capture_active(scene_name) ? 1U : 0U;
 }
 
 castor_engine_result_t castor_engine_configure_video(const castor_engine_video_config_t* config)
@@ -949,7 +949,7 @@ castor_engine_result_t castor_engine_start_recording(const castor_engine_recordi
         }
     }
 
-    const bool scene_active = runtime_ready && main_scene.is_active();
+    const bool scene_active = runtime_ready && scene_registry.has_active_scene();
     void* video_encoder_handle = video_encoder.get_native_encoder();
     void* audio_encoder_handle = audio_encoder.get_native_encoder();
 
@@ -1017,7 +1017,7 @@ castor_engine_result_t castor_engine_start_streaming(void)
     const bool runtime_ready = obs_initialized() && modules_loaded;
     castor::engine::detail::streaming_lifecycle_result result =
         streaming.start(runtime_ready, runtime_ready && video.is_configured(), runtime_ready && audio.is_configured(),
-                        runtime_ready && main_scene.is_active(), recording.is_active(),
+                        runtime_ready && scene_registry.has_active_scene(), recording.is_active(),
                         video_encoder.get_native_encoder(), audio_encoder.get_native_encoder());
     if (result.code != CASTOR_ENGINE_OK)
     {
@@ -1062,20 +1062,137 @@ castor_engine_result_t castor_engine_get_streaming_health(castor_engine_streamin
     return result.code;
 }
 
-castor_engine_result_t castor_engine_create_main_scene(void)
+castor_engine_result_t castor_engine_create_scene(const char* scene_name)
 {
     std::scoped_lock lock(lifecycle_mutex);
     last_error.clear();
+
+    const bool runtime_ready = obs_initialized() && modules_loaded;
+    castor::engine::detail::scene_registry_result result = scene_registry.create_scene(scene_name, runtime_ready);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_delete_scene(const char* scene_name)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    castor::engine::detail::scene_registry_result result = scene_registry.delete_scene(scene_name);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_rename_scene(const char* old_name, const char* new_name)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    castor::engine::detail::scene_registry_result result = scene_registry.rename_scene(old_name, new_name);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+uint32_t castor_engine_get_scene_count(void)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    return scene_registry.scene_count();
+}
+
+uint8_t castor_engine_get_scene_name_at(uint32_t index, char* out_name, uint32_t out_name_size)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+
+    if (out_name == nullptr)
+    {
+        return 0U;
+    }
+
+    std::string name;
+
+    if (!scene_registry.scene_name_at(index, name) || out_name_size < name.size() + 1)
+    {
+        return 0U;
+    }
+
+    copy_to_fixed_buffer(name, out_name, out_name_size);
+    return 1U;
+}
+
+uint8_t castor_engine_get_active_scene_name(char* out_name, uint32_t out_name_size)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+
+    if (out_name == nullptr)
+    {
+        return 0U;
+    }
+
+    std::string name;
+
+    if (!scene_registry.active_scene_name(name) || out_name_size < name.size() + 1)
+    {
+        return 0U;
+    }
+
+    copy_to_fixed_buffer(name, out_name, out_name_size);
+    return 1U;
+}
+
+castor_engine_result_t castor_engine_switch_scene(const char* scene_name,
+                                                  const castor_engine_scene_transition_config_t* transition)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (transition == nullptr)
+    {
+        set_last_error("The scene transition configuration must not be null.");
+        return CASTOR_ENGINE_INVALID_ARGUMENT;
+    }
+
+    if (transition->struct_size < sizeof(castor_engine_scene_transition_config_t))
+    {
+        set_last_error("The scene transition configuration structure is too small.");
+        return CASTOR_ENGINE_INVALID_ARGUMENT;
+    }
+
+    if (transition->type > CASTOR_ENGINE_SCENE_TRANSITION_SWIPE)
+    {
+        set_last_error("The scene transition type is not recognized.");
+        return CASTOR_ENGINE_INVALID_ARGUMENT;
+    }
 
     const bool runtime_ready = obs_initialized() && modules_loaded;
     uint32_t base_width = 0;
     uint32_t base_height = 0;
     const bool video_ready = runtime_ready && video.try_get_base_size(base_width, base_height);
 
+    if (!runtime_ready)
+    {
+        set_last_error("The engine must be initialized before scenes can be switched.");
+        return CASTOR_ENGINE_NOT_INITIALIZED;
+    }
+
     try
     {
-        castor::engine::detail::main_scene_result result =
-            main_scene.create(runtime_ready, video_ready, base_width, base_height);
+        castor::engine::detail::scene_registry_result result =
+            scene_registry.switch_scene(scene_name, *transition, video_ready, base_width, base_height);
 
         if (result.code != CASTOR_ENGINE_OK)
         {
@@ -1086,15 +1203,13 @@ castor_engine_result_t castor_engine_create_main_scene(void)
     }
     catch (const std::exception& exception)
     {
-        main_scene.reset();
-        set_last_error(std::string("Unexpected native main-scene failure: ") + exception.what());
-        return CASTOR_ENGINE_SCENE_CREATION_FAILED;
+        set_last_error(std::string("Unexpected native scene-switch failure: ") + exception.what());
+        return CASTOR_ENGINE_SCENE_TRANSITION_START_FAILED;
     }
     catch (...)
     {
-        main_scene.reset();
-        set_last_error("Unexpected native main-scene failure.");
-        return CASTOR_ENGINE_SCENE_CREATION_FAILED;
+        set_last_error("Unexpected native scene-switch failure.");
+        return CASTOR_ENGINE_SCENE_TRANSITION_START_FAILED;
     }
 }
 
@@ -1107,7 +1222,7 @@ uint8_t castor_engine_has_active_scene(void)
         return 0U;
     }
 
-    return main_scene.is_active() ? 1U : 0U;
+    return scene_registry.has_active_scene() ? 1U : 0U;
 }
 
 void castor_engine_shutdown(void)
@@ -1121,7 +1236,7 @@ void castor_engine_shutdown(void)
         return;
     }
     recording.reset();
-    main_scene.reset();
+    scene_registry.reset();
     video_encoder.reset();
     audio_encoder.reset();
     video.reset();

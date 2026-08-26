@@ -1,6 +1,7 @@
 # RTMP streaming
 
-Castor Engine can send the active main scene to one custom RTMP or RTMPS
+Castor Engine can send the active scene (see
+[Scene Management](scene-management.md)) to one custom RTMP or RTMPS
 destination. The output reuses the engine-owned video and audio encoders; it
 never creates a separate encoder pass.
 
@@ -22,7 +23,8 @@ var key = Environment.GetEnvironmentVariable("CASTOR_RTMP_STREAM_KEY")
 EngineRuntime.Initialize(new EngineRuntimeConfiguration(AppContext.BaseDirectory));
 EngineRuntime.ConfigureVideo(new EngineVideoConfiguration(1280, 720, 1280, 720, 30, 1));
 EngineRuntime.ConfigureAudio(new EngineAudioConfiguration());
-EngineRuntime.CreateMainScene();
+EngineRuntime.CreateScene("wide");
+EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
 EngineRuntime.ConfigureVideoEncoder(new EngineVideoEncoderConfiguration(
     selectionMode: EngineVideoEncoderSelectionMode.SoftwareForced));
 EngineRuntime.ConfigureAudioEncoder(audioBitrate: 128, audioTrackIndex: 0);

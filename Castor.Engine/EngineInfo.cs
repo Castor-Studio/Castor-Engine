@@ -12,7 +12,7 @@ namespace Castor.Engine
         /// <summary>
         /// Gets the ABI version supported by this managed wrapper.
         /// </summary>
-        public const uint SupportedAbiVersion = 11;
+        public const uint SupportedAbiVersion = 12;
 
         /// <summary>
         /// Gets the ABI version exposed by the native Castor Engine library.

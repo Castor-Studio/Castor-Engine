@@ -28,6 +28,18 @@ display_capture_configuration_result validate_display_capture_config(
                        std::to_string(config->struct_size) + ".");
     }
 
+    const void* scene_name_terminator = std::memchr(config->scene_name, '\0', sizeof(config->scene_name));
+
+    if (scene_name_terminator == nullptr)
+    {
+        return failure("The scene name must be null-terminated UTF-8.");
+    }
+
+    if (config->scene_name[0] == '\0')
+    {
+        return failure("The scene name must not be empty.");
+    }
+
     const void* terminator = std::memchr(config->display_id, '\0', sizeof(config->display_id));
 
     if (terminator == nullptr)

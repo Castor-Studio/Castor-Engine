@@ -33,18 +33,36 @@ namespace Castor.Engine
             NativeMethods.IsAudioConfigured() != 0;
 
         /// <summary>
-        /// Gets whether the engine-owned main scene exists and is connected
-        /// to the primary OBS video output.
+        /// Gets whether a scene is currently active and connected to the
+        /// primary OBS video output.
         /// </summary>
         public static bool HasActiveScene =>
             NativeMethods.HasActiveScene() != 0;
 
         /// <summary>
-        /// Gets whether the main scene currently uses an OBS display capture
-        /// source as its visual source.
+        /// Gets the name of the currently active scene, or
+        /// <see langword="null"/> when no scene is active.
         /// </summary>
-        public static bool IsDisplayCaptureActive =>
-            NativeMethods.IsDisplayCaptureActive() != 0;
+        public static string? ActiveSceneName
+        {
+            get
+            {
+                var buffer = new byte[SceneNameBufferSize];
+                return NativeMethods.GetActiveSceneName(buffer, (uint)buffer.Length) == 0
+                    ? null
+                    : DecodeSceneName(buffer);
+            }
+        }
+
+        /// <summary>
+        /// Gets whether the named scene currently uses an OBS display
+        /// capture source as its visual source.
+        /// </summary>
+        public static bool IsDisplayCaptureActive(string sceneName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sceneName);
+            return NativeMethods.IsDisplayCaptureActive(sceneName) != 0;
+        }
 
         /// <summary>
         /// Initializes the OBS runtime and loads the packaged OBS modules.
@@ -161,8 +179,9 @@ namespace Castor.Engine
         }
 
         /// <summary>
-        /// Replaces the main scene's current visual source with capture of the
-        /// selected display. Repeating the same configuration is a no-op.
+        /// Replaces the named scene's current visual source with capture of
+        /// the selected display. Repeating the same configuration is a
+        /// no-op.
         /// </summary>
         public static void ConfigureDisplayCapture(
             EngineDisplayCaptureConfiguration configuration)
@@ -176,6 +195,9 @@ namespace Castor.Engine
                     (uint)Marshal.SizeOf<NativeEngineDisplayCaptureConfiguration>()),
                 CaptureCursor = configuration.CaptureCursor ? (byte)1 : (byte)0,
             };
+            FixedBufferInterop.Encode(
+                configuration.SceneName,
+                nativeConfiguration.SceneName);
             FixedBufferInterop.Encode(
                 configuration.DisplayId,
                 nativeConfiguration.DisplayId);
@@ -760,30 +782,158 @@ namespace Castor.Engine
         }
 
         /// <summary>
-        /// Creates the engine-owned main scene with a deterministic solid-color
-        /// source and connects it to the primary OBS video output. The visual
-        /// source can later be replaced through <see cref="ConfigureDisplayCapture"/>.
+        /// Creates an empty named scene. Scene creation has no fixed count
+        /// limit. A visual source can be added to it through
+        /// <see cref="ConfigureDisplayCapture"/>.
         /// </summary>
-        /// <remarks>
-        /// Repeated calls are idempotent while the main scene remains active.
-        /// </remarks>
+        /// <param name="sceneName">The unique name of the new scene.</param>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="sceneName"/> is null, empty, or
+        /// whitespace.
+        /// </exception>
         /// <exception cref="NotSupportedException">
         /// Thrown when the native and managed ABI versions are incompatible.
         /// </exception>
         /// <exception cref="InvalidOperationException">
-        /// Thrown when the engine or video subsystem is not initialized, or
-        /// when OBS cannot create and activate the main scene.
+        /// Thrown when the engine is not initialized, a scene with the same
+        /// name already exists, or OBS cannot create the scene.
         /// </exception>
-        public static void CreateMainScene()
+        public static void CreateScene(string sceneName)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sceneName);
             EngineInfo.ValidateCompatibility();
 
-            var result = NativeMethods.CreateMainScene();
+            var result = NativeMethods.CreateScene(sceneName);
 
             if (result != NativeEngineResult.Ok)
             {
                 throw CreateNativeOperationException(
-                    "create and activate the main OBS scene",
+                    $"create scene '{sceneName}'",
+                    result);
+            }
+        }
+
+        /// <summary>
+        /// Deletes a named scene and its owned resources.
+        /// </summary>
+        /// <param name="sceneName">The name of the scene to delete.</param>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="sceneName"/> is null, empty, or
+        /// whitespace.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when no scene with that name exists, or when it is
+        /// currently the active scene.
+        /// </exception>
+        public static void DeleteScene(string sceneName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sceneName);
+
+            var result = NativeMethods.DeleteScene(sceneName);
+
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException(
+                    $"delete scene '{sceneName}'",
+                    result);
+            }
+        }
+
+        /// <summary>
+        /// Renames a scene in place. If it is the active scene,
+        /// <see cref="ActiveSceneName"/> reflects the new name afterward.
+        /// </summary>
+        /// <param name="oldName">The scene's current name.</param>
+        /// <param name="newName">The scene's new, unique name.</param>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="oldName"/> or <paramref name="newName"/>
+        /// is null, empty, or whitespace.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when no scene named <paramref name="oldName"/> exists, or
+        /// a different scene already uses <paramref name="newName"/>.
+        /// </exception>
+        public static void RenameScene(string oldName, string newName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(oldName);
+            ArgumentException.ThrowIfNullOrWhiteSpace(newName);
+
+            var result = NativeMethods.RenameScene(oldName, newName);
+
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException(
+                    $"rename scene '{oldName}' to '{newName}'",
+                    result);
+            }
+        }
+
+        /// <summary>
+        /// Enumerates the names of every created scene, in creation order.
+        /// </summary>
+        public static IReadOnlyList<string> GetSceneNames()
+        {
+            var count = NativeMethods.GetSceneCount();
+            var names = new List<string>((int)count);
+            var buffer = new byte[SceneNameBufferSize];
+
+            for (uint index = 0; index < count; index++)
+            {
+                if (NativeMethods.GetSceneNameAt(index, buffer, (uint)buffer.Length) == 0)
+                {
+                    throw CreateNativeOperationException("enumerate scenes");
+                }
+
+                names.Add(DecodeSceneName(buffer));
+            }
+
+            return names;
+        }
+
+        /// <summary>
+        /// Switches the active scene to <paramref name="sceneName"/>,
+        /// applying the requested transition. The first switch after
+        /// startup, and every switch using
+        /// <see cref="EngineSceneTransitionType.Cut"/>, applies instantly.
+        /// Switching to the already-active scene is a no-op.
+        /// </summary>
+        /// <param name="sceneName">The name of the scene to switch to.</param>
+        /// <param name="transition">The transition to apply.</param>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="sceneName"/> is null, empty, or
+        /// whitespace.
+        /// </exception>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown when <paramref name="transition"/> is null.
+        /// </exception>
+        /// <exception cref="NotSupportedException">
+        /// Thrown when the native and managed ABI versions are incompatible.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the engine is not initialized, no scene named
+        /// <paramref name="sceneName"/> exists, the requested transition
+        /// type is unavailable, or OBS fails to create or run it.
+        /// </exception>
+        public static void SwitchScene(string sceneName, EngineSceneTransitionConfiguration transition)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sceneName);
+            ArgumentNullException.ThrowIfNull(transition);
+            EngineInfo.ValidateCompatibility();
+
+            var nativeTransition = new NativeEngineSceneTransitionConfiguration
+            {
+                StructSize = checked(
+                    (uint)Marshal.SizeOf<NativeEngineSceneTransitionConfiguration>()),
+                Type = (uint)transition.TransitionType,
+                DurationMs = transition.DurationMilliseconds,
+            };
+
+            var result = NativeMethods.SwitchScene(sceneName, in nativeTransition);
+
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException(
+                    $"switch to scene '{sceneName}'",
                     result);
             }
         }
@@ -828,6 +978,15 @@ namespace Castor.Engine
                 : Marshal.PtrToStringUTF8(errorPointer);
 
             return string.IsNullOrWhiteSpace(nativeMessage) ? null : nativeMessage;
+        }
+
+        private const int SceneNameBufferSize = 256;
+
+        private static string DecodeSceneName(byte[] buffer)
+        {
+            var terminatorIndex = Array.IndexOf(buffer, (byte)0);
+            var length = terminatorIndex < 0 ? buffer.Length : terminatorIndex;
+            return System.Text.Encoding.UTF8.GetString(buffer, 0, length);
         }
     }
 }

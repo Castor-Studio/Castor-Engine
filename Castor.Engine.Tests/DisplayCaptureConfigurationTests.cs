@@ -17,7 +17,7 @@ namespace Castor.Engine.Tests
         [Fact]
         public void ValidationShouldNotRequireInitialization()
         {
-            var config = NativeDisplayMethods.CreateConfig("display-1");
+            var config = NativeDisplayMethods.CreateConfig("wide", "display-1");
 
             Assert.Equal(
                 NativeDisplayResult.Ok,
@@ -37,7 +37,7 @@ namespace Castor.Engine.Tests
         [Fact]
         public void ValidationShouldRejectUndersizedConfiguration()
         {
-            var config = NativeDisplayMethods.CreateConfig("display-1");
+            var config = NativeDisplayMethods.CreateConfig("wide", "display-1");
             config.StructSize = 1;
 
             var result = NativeDisplayMethods.ValidateDisplayCaptureConfig(config);
@@ -47,9 +47,20 @@ namespace Castor.Engine.Tests
         }
 
         [Fact]
+        public void ValidationShouldRejectEmptySceneName()
+        {
+            var config = NativeDisplayMethods.CreateConfig(string.Empty, "display-1");
+
+            var result = NativeDisplayMethods.ValidateDisplayCaptureConfig(config);
+
+            Assert.Equal(NativeDisplayResult.DisplayInvalidConfiguration, result);
+            Assert.Contains("scene name", NativeDisplayMethods.GetLastErrorMessage());
+        }
+
+        [Fact]
         public void ValidationShouldRejectEmptyDisplayIdentifier()
         {
-            var config = NativeDisplayMethods.CreateConfig(string.Empty);
+            var config = NativeDisplayMethods.CreateConfig("wide", string.Empty);
 
             var result = NativeDisplayMethods.ValidateDisplayCaptureConfig(config);
 
@@ -60,7 +71,7 @@ namespace Castor.Engine.Tests
         [Fact]
         public void ValidationShouldRejectInvalidCursorValue()
         {
-            var config = NativeDisplayMethods.CreateConfig("display-1");
+            var config = NativeDisplayMethods.CreateConfig("wide", "display-1");
             config.CaptureCursor = 2;
 
             var result = NativeDisplayMethods.ValidateDisplayCaptureConfig(config);

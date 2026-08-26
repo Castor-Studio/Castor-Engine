@@ -34,7 +34,7 @@ class video_encoder_subsystem final
 
   private:
     // Opaque obs_encoder_t*, kept as void* so this header never needs to
-    // include obs.h, matching how main_scene_subsystem hides its OBS handles.
+    // include obs.h, matching how scene_registry_subsystem hides its OBS handles.
     void* encoder_ = nullptr;
     bool configured_ = false;
     castor_engine_video_encoder_config_t current_config_{};

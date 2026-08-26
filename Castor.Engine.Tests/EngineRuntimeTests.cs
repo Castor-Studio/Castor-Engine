@@ -197,68 +197,106 @@ namespace Castor.Engine.Tests
         }
 
         [Fact]
-        public void CreateMainSceneShouldRequireInitialization()
+        public void CreateSceneShouldRequireInitialization()
         {
             var exception = Assert.Throws<InvalidOperationException>(
-                EngineRuntime.CreateMainScene);
+                () => EngineRuntime.CreateScene("wide"));
 
             Assert.Contains("NotInitialized", exception.Message);
             Assert.Contains("must be initialized", exception.Message);
             Assert.False(EngineRuntime.HasActiveScene);
         }
 
+        [Fact]
+        public void CreateSceneShouldRejectBlankName()
+        {
+            Assert.Throws<ArgumentException>(() => EngineRuntime.CreateScene(" "));
+        }
+
         [StaFact]
-        public void CreateMainSceneShouldRequireVideoConfiguration()
+        public void CreateSceneShouldNotActivateItByItself()
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
+
+            EngineRuntime.CreateScene("wide");
+
+            Assert.False(EngineRuntime.HasActiveScene);
+            Assert.Contains("wide", EngineRuntime.GetSceneNames());
+        }
+
+        [StaFact]
+        public void CreateSceneShouldRejectDuplicateName()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
+            EngineRuntime.CreateScene("wide");
 
             var exception = Assert.Throws<InvalidOperationException>(
-                EngineRuntime.CreateMainScene);
+                () => EngineRuntime.CreateScene("wide"));
 
-            Assert.Contains("VideoNotConfigured", exception.Message);
-            Assert.Contains("must be configured", exception.Message);
+            Assert.Contains("SceneAlreadyExists", exception.Message);
+        }
+
+        [StaFact]
+        public void SwitchSceneShouldActivateTheCreatedScene()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
+            EngineRuntime.CreateScene("wide");
+
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
+
+            Assert.True(EngineRuntime.HasActiveScene);
+            Assert.Equal("wide", EngineRuntime.ActiveSceneName);
+        }
+
+        [StaFact]
+        public void SwitchSceneShouldRequireExistingScene()
+        {
+            EngineRuntime.Initialize(CreateRuntimeConfiguration());
+            EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
+
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => EngineRuntime.SwitchScene(
+                    "ghost", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut)));
+
+            Assert.Contains("SceneNotFound", exception.Message);
             Assert.False(EngineRuntime.HasActiveScene);
         }
 
         [StaFact]
-        public void CreateMainSceneShouldCreateAndActivateScene()
+        public void DeleteSceneShouldRejectTheActiveScene()
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
 
-            EngineRuntime.CreateMainScene();
+            var exception = Assert.Throws<InvalidOperationException>(() => EngineRuntime.DeleteScene("wide"));
 
-            Assert.True(EngineRuntime.HasActiveScene);
+            Assert.Contains("SceneDeleteActiveScene", exception.Message);
         }
 
         [StaFact]
-        public void CreateMainSceneShouldBeIdempotent()
-        {
-            EngineRuntime.Initialize(CreateRuntimeConfiguration());
-            EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-
-            EngineRuntime.CreateMainScene();
-            EngineRuntime.CreateMainScene();
-
-            Assert.True(EngineRuntime.HasActiveScene);
-        }
-
-        [StaFact]
-        public void MainSceneLifecycleShouldWorkAfterRuntimeRestart()
+        public void SceneLifecycleShouldWorkAfterRuntimeRestart()
         {
             var runtimeConfiguration = CreateRuntimeConfiguration();
             var videoConfiguration = CreateVideoConfiguration();
+            var cut = new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut);
 
             EngineRuntime.Initialize(runtimeConfiguration);
             EngineRuntime.ConfigureVideo(videoConfiguration);
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", cut);
             EngineRuntime.Shutdown();
 
             Assert.False(EngineRuntime.HasActiveScene);
 
             EngineRuntime.Initialize(runtimeConfiguration);
             EngineRuntime.ConfigureVideo(videoConfiguration);
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", cut);
 
             Assert.True(EngineRuntime.HasActiveScene);
         }
@@ -268,7 +306,8 @@ namespace Castor.Engine.Tests
         {
             EngineRuntime.Initialize(CreateRuntimeConfiguration());
             EngineRuntime.ConfigureVideo(CreateVideoConfiguration());
-            EngineRuntime.CreateMainScene();
+            EngineRuntime.CreateScene("wide");
+            EngineRuntime.SwitchScene("wide", new EngineSceneTransitionConfiguration(EngineSceneTransitionType.Cut));
 
             EngineRuntime.Shutdown();
             EngineRuntime.Shutdown();
