@@ -42,7 +42,6 @@ class fake_scene_backend final : public scene_backend
     std::string last_renamed_to;
     castor_engine_scene_transition_type_t last_transition_type = CASTOR_ENGINE_SCENE_TRANSITION_CUT;
     uint32_t last_transition_duration = 0;
-    void* last_transition_target = nullptr;
     std::vector<std::string> cleanup_events;
 
     void* create_scene(const char*) noexcept override
@@ -184,7 +183,6 @@ class fake_scene_backend final : public scene_backend
     {
         ++start_transition_calls;
         last_transition_duration = duration_ms;
-        last_transition_target = target_source;
 
         if (!transition_start_succeeds)
         {
@@ -574,7 +572,9 @@ bool configure_display_capture_targets_specific_scene_independent_of_active()
 
     return expect(result.code == CASTOR_ENGINE_OK, "configuring a backgrounded scene succeeds") &&
            expect(registry.is_display_capture_active("closeup"), "the backgrounded scene reports capture active") &&
-           expect(!registry.is_display_capture_active("wide"), "the active scene is unaffected");
+           expect(!registry.is_display_capture_active("wide"), "the active scene is unaffected") &&
+           expect(backend.requested_display_id == "display-1", "the selected display id reaches the backend") &&
+           expect(backend.requested_capture_cursor, "the cursor preference reaches the backend");
 }
 
 bool scene_exists_reflects_registry_state()

@@ -48,6 +48,11 @@ extern "C"
         CASTOR_ENGINE_AUDIO_CONFIGURATION_FAILED = 15,
 
         CASTOR_ENGINE_SCENE_CREATION_FAILED = 16,
+        /* 17-20 described the single default scene's own color-source
+         * placeholder and output-channel activation, both removed when
+         * scene management became a dynamic registry. Kept defined and
+         * unused rather than renumbered, per the ABI's append-only
+         * contract. */
         CASTOR_ENGINE_SCENE_SOURCE_UNAVAILABLE = 17,
         CASTOR_ENGINE_SCENE_SOURCE_CREATION_FAILED = 18,
         CASTOR_ENGINE_SCENE_SOURCE_ADD_FAILED = 19,
@@ -77,6 +82,10 @@ extern "C"
         CASTOR_ENGINE_DISPLAY_SOURCE_UNAVAILABLE = 39,
         CASTOR_ENGINE_DISPLAY_SOURCE_CREATION_FAILED = 40,
         CASTOR_ENGINE_DISPLAY_SOURCE_ADD_FAILED = 41,
+        /* Configuring display capture on a named scene no longer requires
+         * that scene to be active (see CASTOR_ENGINE_SCENE_NOT_FOUND
+         * instead). Kept defined and unused for the same reason as 17-20
+         * above. */
         CASTOR_ENGINE_DISPLAY_NO_ACTIVE_SCENE = 42,
         CASTOR_ENGINE_DISPLAY_RECONFIGURATION_WHILE_RECORDING = 43,
 
