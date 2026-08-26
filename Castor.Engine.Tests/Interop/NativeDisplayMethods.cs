@@ -49,7 +49,7 @@ namespace Castor.Engine.Tests.Interop
         internal byte CaptureCursor;
     }
 
-    internal static class NativeDisplayMethods
+    internal static partial class NativeDisplayMethods
     {
         private const string LibraryName = "Castor.Engine.Host";
 
@@ -95,17 +95,19 @@ namespace Castor.Engine.Tests.Interop
             CallingConvention = CallingConvention.Cdecl)]
         internal static extern NativeDisplayResult ConfigureDisplayCapture(in NativeDisplayCaptureConfig config);
 
-        [DllImport(
+        [LibraryImport(
             LibraryName,
             EntryPoint = "castor_engine_is_display_capture_active",
-            CallingConvention = CallingConvention.Cdecl)]
-        internal static extern byte IsDisplayCaptureActive([MarshalAs(UnmanagedType.LPUTF8Str)] string sceneName);
+            StringMarshalling = StringMarshalling.Utf8)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial byte IsDisplayCaptureActive(string sceneName);
 
-        [DllImport(
+        [LibraryImport(
             LibraryName,
             EntryPoint = "castor_engine_create_scene",
-            CallingConvention = CallingConvention.Cdecl)]
-        internal static extern NativeDisplayResult CreateScene([MarshalAs(UnmanagedType.LPUTF8Str)] string sceneName);
+            StringMarshalling = StringMarshalling.Utf8)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeDisplayResult CreateScene(string sceneName);
 
         internal static NativeDisplayCaptureConfig CreateConfig(string sceneName, string displayId,
                                                                  bool captureCursor = true)

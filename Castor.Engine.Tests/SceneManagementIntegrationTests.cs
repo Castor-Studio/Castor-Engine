@@ -8,6 +8,9 @@ namespace Castor.Engine.Tests
     /// </summary>
     public sealed class SceneManagementIntegrationTests : IDisposable
     {
+        private static readonly string[] AllThreeSceneNames = { "wide", "closeup", "halftime" };
+        private static readonly string[] RemainingSceneNamesAfterDelete = { "wide", "halftime" };
+
         public SceneManagementIntegrationTests()
         {
             EngineRuntime.Shutdown();
@@ -30,9 +33,7 @@ namespace Castor.Engine.Tests
             EngineRuntime.CreateScene("closeup");
             EngineRuntime.CreateScene("halftime");
 
-            Assert.Equal(
-                new[] { "wide", "closeup", "halftime" },
-                EngineRuntime.GetSceneNames());
+            Assert.Equal(AllThreeSceneNames, EngineRuntime.GetSceneNames());
             Assert.Null(EngineRuntime.ActiveSceneName);
             Assert.False(EngineRuntime.HasActiveScene);
 
@@ -69,7 +70,7 @@ namespace Castor.Engine.Tests
             EngineRuntime.RenameScene("closeup", "close-up-camera");
             EngineRuntime.DeleteScene("close-up-camera");
 
-            Assert.Equal(new[] { "wide", "halftime" }, EngineRuntime.GetSceneNames());
+            Assert.Equal(RemainingSceneNamesAfterDelete, EngineRuntime.GetSceneNames());
         }
     }
 }
