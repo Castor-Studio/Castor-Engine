@@ -46,6 +46,11 @@ not activate it. Attach a visual source to it with
 [`ConfigureDisplayCapture`](display-capture.md) (before or after creation,
 active or not), then bring it on air with `SwitchScene`.
 
+Once a visual source is configured, its position, scale, rotation, bounds, and
+crop can be read or updated through the
+[`Scene Item Transforms`](scene-item-transforms.md) API without activating the
+scene or replacing its source.
+
 `EngineRuntime.SwitchScene` is synchronous: for any transition type other
 than `Cut`, the call blocks until OBS finishes animating it. Switching to the
 scene that is already active is a no-op. Switching to an unknown scene name
@@ -74,6 +79,9 @@ The managed wrapper exposes the same contract through `EngineRuntime`'s
 `castor_engine_scene_transition_config_t` carries a
 `castor_engine_scene_transition_type_t` (`Cut`, `Fade`, `Slide`, or `Swipe`)
 and a `duration_ms`, ignored for `Cut`.
+
+Transform operations are documented separately because they target the single
+visual item owned by each scene rather than the scene container itself.
 
 ## Native implementation
 

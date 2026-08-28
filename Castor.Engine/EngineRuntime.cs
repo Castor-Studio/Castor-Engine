@@ -939,6 +939,107 @@ namespace Castor.Engine
         }
 
         /// <summary>
+        /// Reads the stored transform of a named scene's single visual item.
+        /// The scene does not need to be active.
+        /// </summary>
+        /// <param name="sceneName">The name of the scene to inspect.</param>
+        /// <returns>A mutable snapshot of the visual item's transform.</returns>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="sceneName"/> is null, empty, or
+        /// whitespace.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the engine is not initialized, the scene does not
+        /// exist, or the scene has no visual item.
+        /// </exception>
+        public static EngineSceneItemTransform GetSceneItemTransform(string sceneName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sceneName);
+            EngineInfo.ValidateCompatibility();
+
+            var nativeTransform = new NativeEngineSceneItemTransform
+            {
+                StructSize = checked((uint)Marshal.SizeOf<NativeEngineSceneItemTransform>()),
+            };
+
+            var result = NativeMethods.GetSceneItemTransform(sceneName, ref nativeTransform);
+
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException(
+                    $"read the visual item transform for scene '{sceneName}'",
+                    result);
+            }
+
+            return new EngineSceneItemTransform
+            {
+                PositionX = nativeTransform.PositionX,
+                PositionY = nativeTransform.PositionY,
+                ScaleX = nativeTransform.ScaleX,
+                ScaleY = nativeTransform.ScaleY,
+                RotationDegrees = nativeTransform.RotationDegrees,
+                BoundsMode = (EngineSceneItemBoundsMode)nativeTransform.BoundsMode,
+                BoundsWidth = nativeTransform.BoundsWidth,
+                BoundsHeight = nativeTransform.BoundsHeight,
+                CropLeft = nativeTransform.CropLeft,
+                CropTop = nativeTransform.CropTop,
+                CropRight = nativeTransform.CropRight,
+                CropBottom = nativeTransform.CropBottom,
+            };
+        }
+
+        /// <summary>
+        /// Atomically applies a complete transform snapshot to a named
+        /// scene's visual item without recreating the item or its source.
+        /// The scene does not need to be active.
+        /// </summary>
+        /// <param name="sceneName">The name of the scene to update.</param>
+        /// <param name="transform">The complete transform snapshot.</param>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="sceneName"/> is null, empty, or
+        /// whitespace.
+        /// </exception>
+        /// <exception cref="ArgumentNullException">
+        /// Thrown when <paramref name="transform"/> is null.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the engine is not initialized, the scene or visual
+        /// item does not exist, or the transform is invalid.
+        /// </exception>
+        public static void SetSceneItemTransform(string sceneName, EngineSceneItemTransform transform)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sceneName);
+            ArgumentNullException.ThrowIfNull(transform);
+            EngineInfo.ValidateCompatibility();
+
+            var nativeTransform = new NativeEngineSceneItemTransform
+            {
+                StructSize = checked((uint)Marshal.SizeOf<NativeEngineSceneItemTransform>()),
+                PositionX = transform.PositionX,
+                PositionY = transform.PositionY,
+                ScaleX = transform.ScaleX,
+                ScaleY = transform.ScaleY,
+                RotationDegrees = transform.RotationDegrees,
+                BoundsMode = (NativeEngineSceneItemBoundsMode)transform.BoundsMode,
+                BoundsWidth = transform.BoundsWidth,
+                BoundsHeight = transform.BoundsHeight,
+                CropLeft = transform.CropLeft,
+                CropTop = transform.CropTop,
+                CropRight = transform.CropRight,
+                CropBottom = transform.CropBottom,
+            };
+
+            var result = NativeMethods.SetSceneItemTransform(sceneName, in nativeTransform);
+
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException(
+                    $"apply the visual item transform for scene '{sceneName}'",
+                    result);
+            }
+        }
+
+        /// <summary>
         /// Shuts down the OBS runtime.
         /// </summary>
         public static void Shutdown()

@@ -31,6 +31,10 @@ class scene_backend
 
     virtual void* add_source_to_scene(void* scene, void* source) noexcept = 0;
     virtual void remove_source_from_scene(void* scene_item) noexcept = 0;
+    virtual void get_scene_item_transform(void* scene_item,
+                                          castor_engine_scene_item_transform_t& out_transform) noexcept = 0;
+    virtual void set_scene_item_transform(void* scene_item,
+                                          const castor_engine_scene_item_transform_t& transform) noexcept = 0;
 
     virtual void set_output_source(void* source) noexcept = 0;
     virtual void* get_output_source() noexcept = 0;
@@ -69,6 +73,11 @@ class scene_registry_subsystem final
                                                     long long obs_monitor_index, bool capture_cursor,
                                                     bool recording_active, bool streaming_active);
     bool is_display_capture_active(const char* scene_name) const noexcept;
+
+    scene_registry_result get_scene_item_transform(const char* scene_name,
+                                                   castor_engine_scene_item_transform_t& out_transform);
+    scene_registry_result set_scene_item_transform(const char* scene_name,
+                                                   const castor_engine_scene_item_transform_t& transform);
 
     scene_registry_result switch_scene(const char* name, const castor_engine_scene_transition_config_t& transition,
                                        bool video_ready, uint32_t width, uint32_t height);

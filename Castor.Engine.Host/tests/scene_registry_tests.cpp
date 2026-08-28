@@ -2,10 +2,12 @@
 
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <set>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace
@@ -31,6 +33,8 @@ class fake_scene_backend final : public scene_backend
     uint32_t source_releases = 0;
     uint32_t add_attempts = 0;
     uint32_t item_removals = 0;
+    uint32_t transform_gets = 0;
+    uint32_t transform_sets = 0;
     uint32_t set_output_calls = 0;
     uint32_t transition_creations = 0;
     uint32_t transition_releases = 0;
@@ -112,13 +116,44 @@ class fake_scene_backend final : public scene_backend
         }
 
         items_.push_back(std::make_unique<int>(0));
-        return items_.back().get();
+        void* item = items_.back().get();
+        item_transforms_[item] = {static_cast<uint32_t>(sizeof(castor_engine_scene_item_transform_t)),
+                                  0.0F,
+                                  0.0F,
+                                  1.0F,
+                                  1.0F,
+                                  0.0F,
+                                  CASTOR_ENGINE_SCENE_ITEM_BOUNDS_NONE,
+                                  0.0F,
+                                  0.0F,
+                                  0,
+                                  0,
+                                  0,
+                                  0};
+        return item;
     }
 
-    void remove_source_from_scene(void*) noexcept override
+    void remove_source_from_scene(void* scene_item) noexcept override
     {
         ++item_removals;
         cleanup_events.emplace_back("remove_item");
+        item_transforms_.erase(scene_item);
+    }
+
+    void get_scene_item_transform(void* scene_item,
+                                  castor_engine_scene_item_transform_t& out_transform) noexcept override
+    {
+        ++transform_gets;
+        const uint32_t requested_size = out_transform.struct_size;
+        out_transform = item_transforms_[scene_item];
+        out_transform.struct_size = requested_size;
+    }
+
+    void set_scene_item_transform(void* scene_item,
+                                  const castor_engine_scene_item_transform_t& transform) noexcept override
+    {
+        ++transform_sets;
+        item_transforms_[scene_item] = transform;
     }
 
     void set_output_source(void* source) noexcept override
@@ -204,6 +239,7 @@ class fake_scene_backend final : public scene_backend
     std::vector<std::unique_ptr<int>> items_;
     std::vector<std::unique_ptr<int>> transitions_;
     std::set<void*> released_;
+    std::unordered_map<void*, castor_engine_scene_item_transform_t> item_transforms_;
     void* output_source_ = nullptr;
 };
 
@@ -212,6 +248,36 @@ castor_engine_scene_transition_config_t make_transition(castor_engine_scene_tran
 {
     return {static_cast<uint32_t>(sizeof(castor_engine_scene_transition_config_t)), static_cast<uint32_t>(type),
             duration_ms};
+}
+
+castor_engine_scene_item_transform_t make_transform(
+    castor_engine_scene_item_bounds_mode_t bounds_mode = CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_INNER)
+{
+    const bool has_bounds = bounds_mode != CASTOR_ENGINE_SCENE_ITEM_BOUNDS_NONE;
+    return {static_cast<uint32_t>(sizeof(castor_engine_scene_item_transform_t)),
+            120.25F,
+            64.5F,
+            -0.75F,
+            1.25F,
+            450.0F,
+            static_cast<uint32_t>(bounds_mode),
+            has_bounds ? 640.0F : 0.0F,
+            has_bounds ? 360.0F : 0.0F,
+            11,
+            12,
+            13,
+            14};
+}
+
+bool transforms_equal(const castor_engine_scene_item_transform_t& left,
+                      const castor_engine_scene_item_transform_t& right)
+{
+    return left.struct_size == right.struct_size && left.position_x == right.position_x &&
+           left.position_y == right.position_y && left.scale_x == right.scale_x && left.scale_y == right.scale_y &&
+           left.rotation_degrees == right.rotation_degrees && left.bounds_mode == right.bounds_mode &&
+           left.bounds_width == right.bounds_width && left.bounds_height == right.bounds_height &&
+           left.crop_left == right.crop_left && left.crop_top == right.crop_top &&
+           left.crop_right == right.crop_right && left.crop_bottom == right.crop_bottom;
 }
 
 bool expect(bool condition, std::string_view message)
@@ -598,6 +664,181 @@ bool configure_display_capture_unknown_scene_is_not_found()
     return expect(result.code == CASTOR_ENGINE_SCENE_NOT_FOUND, "configuring an unknown scene is explicit");
 }
 
+bool transform_requires_a_known_scene_with_a_visual_item()
+{
+    fake_scene_backend backend;
+    scene_registry_subsystem registry(backend);
+    registry.create_scene("wide", true);
+
+    castor_engine_scene_item_transform_t output{};
+    output.struct_size = sizeof(output);
+    const auto missing_item = registry.get_scene_item_transform("wide", output);
+    const auto missing_scene = registry.set_scene_item_transform("ghost", make_transform());
+    const auto invalid_name = registry.set_scene_item_transform("", make_transform());
+
+    return expect(missing_item.code == CASTOR_ENGINE_SCENE_ITEM_NOT_FOUND,
+                  "an empty scene has no transformable item") &&
+           expect(missing_scene.code == CASTOR_ENGINE_SCENE_NOT_FOUND, "an unknown scene is explicit") &&
+           expect(invalid_name.code == CASTOR_ENGINE_SCENE_INVALID_NAME, "a blank scene name is explicit") &&
+           expect(backend.transform_gets == 0 && backend.transform_sets == 0,
+                  "invalid targets never reach the transform backend");
+}
+
+bool transforms_round_trip_independently_without_recreating_items()
+{
+    fake_scene_backend backend;
+    scene_registry_subsystem registry(backend);
+    registry.create_scene("wide", true);
+    registry.create_scene("closeup", true);
+    registry.configure_display_capture("wide", "display-1", true, "display-1", 0, true, false, false);
+    registry.configure_display_capture("closeup", "display-1", true, "display-1", 0, true, false, false);
+    registry.switch_scene("wide", make_transition(CASTOR_ENGINE_SCENE_TRANSITION_CUT, 0), true, 1280, 720);
+
+    const auto wide_transform = make_transform(CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_INNER);
+    auto closeup_transform = make_transform(CASTOR_ENGINE_SCENE_ITEM_BOUNDS_STRETCH);
+    closeup_transform.position_x = 800.0F;
+    closeup_transform.scale_y = -2.0F;
+    const uint32_t adds_before = backend.add_attempts;
+    const uint32_t removals_before = backend.item_removals;
+
+    const auto set_wide = registry.set_scene_item_transform("wide", wide_transform);
+    const auto set_closeup = registry.set_scene_item_transform("closeup", closeup_transform);
+
+    castor_engine_scene_item_transform_t actual_wide{};
+    actual_wide.struct_size = sizeof(actual_wide);
+    castor_engine_scene_item_transform_t actual_closeup{};
+    actual_closeup.struct_size = sizeof(actual_closeup);
+    const auto get_wide = registry.get_scene_item_transform("wide", actual_wide);
+    const auto get_closeup = registry.get_scene_item_transform("closeup", actual_closeup);
+
+    return expect(set_wide.code == CASTOR_ENGINE_OK && set_closeup.code == CASTOR_ENGINE_OK,
+                  "active and background scene transforms can be written") &&
+           expect(get_wide.code == CASTOR_ENGINE_OK && get_closeup.code == CASTOR_ENGINE_OK,
+                  "active and background scene transforms can be read") &&
+           expect(transforms_equal(wide_transform, actual_wide), "the active scene transform round-trips exactly") &&
+           expect(transforms_equal(closeup_transform, actual_closeup),
+                  "the background scene transform round-trips independently") &&
+           expect(backend.add_attempts == adds_before && backend.item_removals == removals_before,
+                  "transform writes do not recreate scene items") &&
+           expect(backend.transform_sets == 2 && backend.transform_gets == 2,
+                  "each transform operation reaches the backend exactly once");
+}
+
+bool every_bounds_mode_round_trips()
+{
+    fake_scene_backend backend;
+    scene_registry_subsystem registry(backend);
+    registry.create_scene("wide", true);
+    registry.configure_display_capture("wide", "display-1", true, "display-1", 0, true, false, false);
+
+    bool passed = true;
+
+    for (uint32_t mode = CASTOR_ENGINE_SCENE_ITEM_BOUNDS_NONE; mode <= CASTOR_ENGINE_SCENE_ITEM_BOUNDS_MAX_ONLY; ++mode)
+    {
+        const auto expected = make_transform(static_cast<castor_engine_scene_item_bounds_mode_t>(mode));
+        castor_engine_scene_item_transform_t actual{};
+        actual.struct_size = sizeof(actual);
+
+        const auto set_result = registry.set_scene_item_transform("wide", expected);
+        const auto get_result = registry.get_scene_item_transform("wide", actual);
+        passed = expect(set_result.code == CASTOR_ENGINE_OK && get_result.code == CASTOR_ENGINE_OK,
+                        "each bounds mode can be written and read") &&
+                 passed;
+        passed = expect(transforms_equal(expected, actual), "each bounds mode round-trips exactly") && passed;
+    }
+
+    return passed;
+}
+
+bool invalid_transforms_are_rejected_before_the_backend()
+{
+    fake_scene_backend backend;
+    scene_registry_subsystem registry(backend);
+    registry.create_scene("wide", true);
+    registry.configure_display_capture("wide", "display-1", true, "display-1", 0, true, false, false);
+    bool passed = true;
+
+    auto invalid = make_transform();
+    invalid.struct_size = 1;
+    passed =
+        expect(registry.set_scene_item_transform("wide", invalid).code == CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+               "an undersized transform is rejected") &&
+        passed;
+
+    invalid = make_transform();
+    invalid.position_x = std::numeric_limits<float>::quiet_NaN();
+    passed =
+        expect(registry.set_scene_item_transform("wide", invalid).code == CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+               "NaN is rejected") &&
+        passed;
+
+    invalid = make_transform();
+    invalid.scale_y = std::numeric_limits<float>::infinity();
+    passed =
+        expect(registry.set_scene_item_transform("wide", invalid).code == CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+               "infinity is rejected") &&
+        passed;
+
+    invalid = make_transform();
+    invalid.bounds_mode = CASTOR_ENGINE_SCENE_ITEM_BOUNDS_MAX_ONLY + 1;
+    passed =
+        expect(registry.set_scene_item_transform("wide", invalid).code == CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+               "an unknown bounds mode is rejected") &&
+        passed;
+
+    invalid = make_transform();
+    invalid.bounds_width = 0.0F;
+    passed =
+        expect(registry.set_scene_item_transform("wide", invalid).code == CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+               "enabled bounds require positive dimensions") &&
+        passed;
+
+    invalid = make_transform(CASTOR_ENGINE_SCENE_ITEM_BOUNDS_NONE);
+    invalid.bounds_height = -1.0F;
+    passed =
+        expect(registry.set_scene_item_transform("wide", invalid).code == CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+               "negative bounds are rejected even when disabled") &&
+        passed;
+
+    invalid = make_transform();
+    invalid.crop_left = std::numeric_limits<uint32_t>::max();
+    passed =
+        expect(registry.set_scene_item_transform("wide", invalid).code == CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+               "crop values above INT32_MAX are rejected") &&
+        passed;
+
+    castor_engine_scene_item_transform_t undersized_output{};
+    undersized_output.struct_size = 1;
+    passed = expect(registry.get_scene_item_transform("wide", undersized_output).code ==
+                        CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+                    "an undersized output structure is rejected") &&
+             passed;
+
+    return expect(backend.transform_sets == 0 && backend.transform_gets == 0,
+                  "invalid transforms never reach the backend") &&
+           passed;
+}
+
+bool renaming_a_scene_preserves_its_item_transform()
+{
+    fake_scene_backend backend;
+    scene_registry_subsystem registry(backend);
+    registry.create_scene("wide", true);
+    registry.configure_display_capture("wide", "display-1", true, "display-1", 0, true, false, false);
+    const auto expected = make_transform(CASTOR_ENGINE_SCENE_ITEM_BOUNDS_MAX_ONLY);
+    registry.set_scene_item_transform("wide", expected);
+    registry.rename_scene("wide", "closeup");
+
+    castor_engine_scene_item_transform_t actual{};
+    actual.struct_size = sizeof(actual);
+    const auto renamed_result = registry.get_scene_item_transform("closeup", actual);
+
+    return expect(renamed_result.code == CASTOR_ENGINE_OK, "the renamed scene keeps its visual item") &&
+           expect(transforms_equal(expected, actual), "the renamed scene keeps its transform") &&
+           expect(registry.get_scene_item_transform("wide", actual).code == CASTOR_ENGINE_SCENE_NOT_FOUND,
+                  "the previous scene name no longer resolves");
+}
+
 bool reset_tears_down_everything_and_permits_restart()
 {
     fake_scene_backend backend;
@@ -663,6 +904,12 @@ int main()
          configure_display_capture_targets_specific_scene_independent_of_active},
         {"scene_exists_reflects_registry_state", scene_exists_reflects_registry_state},
         {"configure_display_capture_unknown_scene_is_not_found", configure_display_capture_unknown_scene_is_not_found},
+        {"transform_requires_a_known_scene_with_a_visual_item", transform_requires_a_known_scene_with_a_visual_item},
+        {"transforms_round_trip_independently_without_recreating_items",
+         transforms_round_trip_independently_without_recreating_items},
+        {"every_bounds_mode_round_trips", every_bounds_mode_round_trips},
+        {"invalid_transforms_are_rejected_before_the_backend", invalid_transforms_are_rejected_before_the_backend},
+        {"renaming_a_scene_preserves_its_item_transform", renaming_a_scene_preserves_its_item_transform},
         {"reset_tears_down_everything_and_permits_restart", reset_tears_down_everything_and_permits_restart},
     };
 

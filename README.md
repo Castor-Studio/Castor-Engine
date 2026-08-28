@@ -35,6 +35,7 @@ This repository does not contain:
 - [OBS video configuration](docs/video-configuration.md)
 - [Scene management](docs/scene-management.md)
 - [Display capture](docs/display-capture.md)
+- [Scene item transforms](docs/scene-item-transforms.md)
 - [Video and audio encoder configuration](docs/video-encoder-configuration.md)
 - [MKV recording](docs/recording.md)
 - [RTMP streaming](docs/streaming.md)

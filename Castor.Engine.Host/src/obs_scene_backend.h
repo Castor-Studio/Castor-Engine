@@ -19,6 +19,10 @@ class obs_scene_backend final : public scene_backend
 
     void* add_source_to_scene(void* scene, void* source) noexcept override;
     void remove_source_from_scene(void* scene_item) noexcept override;
+    void get_scene_item_transform(void* scene_item,
+                                  castor_engine_scene_item_transform_t& out_transform) noexcept override;
+    void set_scene_item_transform(void* scene_item,
+                                  const castor_engine_scene_item_transform_t& transform) noexcept override;
 
     void set_output_source(void* source) noexcept override;
     void* get_output_source() noexcept override;

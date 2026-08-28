@@ -87,6 +87,9 @@ namespace Castor.Engine.Interop
         SceneTransitionUnavailable = 70,
         SceneTransitionCreationFailed = 71,
         SceneTransitionStartFailed = 72,
+
+        SceneItemNotFound = 73,
+        SceneItemInvalidTransform = 74,
     }
 
     internal enum NativeEngineSceneTransitionType
@@ -95,6 +98,17 @@ namespace Castor.Engine.Interop
         Fade = 1,
         Slide = 2,
         Swipe = 3,
+    }
+
+    internal enum NativeEngineSceneItemBoundsMode
+    {
+        None = 0,
+        Stretch = 1,
+        ScaleInner = 2,
+        ScaleOuter = 3,
+        ScaleToWidth = 4,
+        ScaleToHeight = 5,
+        MaxOnly = 6,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -211,6 +225,24 @@ namespace Castor.Engine.Interop
         internal uint StructSize;
         internal uint Type;
         internal uint DurationMs;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineSceneItemTransform
+    {
+        internal uint StructSize;
+        internal float PositionX;
+        internal float PositionY;
+        internal float ScaleX;
+        internal float ScaleY;
+        internal float RotationDegrees;
+        internal NativeEngineSceneItemBoundsMode BoundsMode;
+        internal float BoundsWidth;
+        internal float BoundsHeight;
+        internal uint CropLeft;
+        internal uint CropTop;
+        internal uint CropRight;
+        internal uint CropBottom;
     }
 
     internal static partial class NativeMethods
@@ -514,6 +546,24 @@ namespace Castor.Engine.Interop
         internal static partial NativeEngineResult SwitchScene(
             string sceneName,
             in NativeEngineSceneTransitionConfiguration transition);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_scene_item_transform",
+            StringMarshalling = StringMarshalling.Utf8)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult GetSceneItemTransform(
+            string sceneName,
+            ref NativeEngineSceneItemTransform transform);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_set_scene_item_transform",
+            StringMarshalling = StringMarshalling.Utf8)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult SetSceneItemTransform(
+            string sceneName,
+            in NativeEngineSceneItemTransform transform);
 
         [LibraryImport(
             LibraryName,
