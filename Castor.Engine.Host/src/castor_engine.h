@@ -634,8 +634,7 @@ extern "C"
      * single output. Returns CASTOR_ENGINE_NOT_INITIALIZED if the engine
      * has not been initialized.
      */
-    CASTOR_ENGINE_API castor_engine_result_t
-    castor_engine_get_render_stats(castor_engine_render_stats_t* out_stats);
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_get_render_stats(castor_engine_render_stats_t* out_stats);
 
     /** Creates an empty named scene. Scene creation has no fixed count limit. */
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_create_scene(const char* scene_name);
