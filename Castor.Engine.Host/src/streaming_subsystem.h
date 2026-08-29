@@ -85,7 +85,7 @@ class streaming_subsystem final
   private:
     static void handle_event(void* data, streaming_event event, streaming_stop_reason reason);
     void on_event(streaming_event event, streaming_stop_reason reason);
-    void release_resources() noexcept;
+    void release_resources(bool trust_confirmed_stop = false) noexcept;
     void clear_secret(std::string& value) noexcept;
     std::string redact(std::string message) const;
     void set_failure(castor_engine_result_t code, std::string message);

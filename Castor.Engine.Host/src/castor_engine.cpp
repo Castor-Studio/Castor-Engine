@@ -46,6 +46,28 @@ castor::engine::detail::streaming_subsystem streaming(streaming_backend);
 castor::engine::detail::obs_scene_backend scene_backend;
 castor::engine::detail::scene_registry_subsystem scene_registry(scene_backend);
 
+// Recording and streaming normally share the primary video/audio encoders
+// above - the design the encoder retrieval API documents. But binding the
+// same live obs_encoder_t to two started outputs turns out to be unsafe:
+// stopping either output while the other is still active corrupts the
+// encoder's interleave/packet-timing bookkeeping and hangs the other
+// output's own stop (reproduced consistently while validating #42,
+// independent of stop order, including during castor_engine_shutdown).
+// Whichever output starts *second*, while the other is already running,
+// gets this isolated secondary pair instead - never shared with an
+// already-active output - so independent stop stays safe.
+castor::engine::detail::video_encoder_subsystem secondary_video_encoder;
+castor::engine::detail::audio_encoder_subsystem secondary_audio_encoder;
+
+enum class encoder_slot
+{
+    none,
+    primary,
+    secondary,
+};
+encoder_slot recording_encoder_slot = encoder_slot::none;
+encoder_slot streaming_encoder_slot = encoder_slot::none;
+
 std::string path_to_utf8(const std::filesystem::path& path)
 {
     const auto utf8_path = path.generic_u8string();
@@ -56,6 +78,27 @@ std::string path_to_utf8(const std::filesystem::path& path)
 void set_last_error(std::string message)
 {
     last_error = std::move(message);
+}
+
+castor::engine::detail::video_encoder_lifecycle_result auto_configure_video_encoder(
+    castor::engine::detail::video_encoder_subsystem& target, bool runtime_ready, bool video_ready)
+{
+    castor_engine_video_encoder_config_t default_encoder_config{};
+    default_encoder_config.struct_size = sizeof(default_encoder_config);
+    default_encoder_config.selection_mode = CASTOR_ENGINE_VIDEO_ENCODER_SOFTWARE_FORCED;
+    default_encoder_config.bitrate = 2500;
+    default_encoder_config.rate_control = CASTOR_ENGINE_VIDEO_ENCODER_RATE_CONTROL_CBR;
+    return target.configure(&default_encoder_config, runtime_ready, video_ready);
+}
+
+castor::engine::detail::audio_encoder_lifecycle_result auto_configure_audio_encoder(
+    castor::engine::detail::audio_encoder_subsystem& target, bool runtime_ready, bool audio_ready)
+{
+    castor_engine_video_encoder_config_t default_audio_encoder_config{};
+    default_audio_encoder_config.struct_size = sizeof(default_audio_encoder_config);
+    default_audio_encoder_config.audio_bitrate = 128;
+    default_audio_encoder_config.audio_track_index = 0;
+    return target.configure(&default_audio_encoder_config, runtime_ready, audio_ready);
 }
 
 void copy_to_fixed_buffer(const std::string& source, char* destination, size_t destination_size)
@@ -864,16 +907,18 @@ castor_engine_result_t castor_engine_start_recording(const castor_engine_recordi
     const bool runtime_ready = obs_initialized() && modules_loaded;
     const bool video_ready = runtime_ready && video.is_configured();
 
-    if (runtime_ready && video_ready && !video_encoder.is_configured())
-    {
-        castor_engine_video_encoder_config_t default_encoder_config{};
-        default_encoder_config.struct_size = sizeof(default_encoder_config);
-        default_encoder_config.selection_mode = CASTOR_ENGINE_VIDEO_ENCODER_SOFTWARE_FORCED;
-        default_encoder_config.bitrate = 2500;
-        default_encoder_config.rate_control = CASTOR_ENGINE_VIDEO_ENCODER_RATE_CONTROL_CBR;
+    // Streaming already running on the primary encoders means recording
+    // cannot safely share them - see the encoder_slot comment above.
+    const bool use_secondary = streaming_encoder_slot == encoder_slot::primary;
+    castor::engine::detail::video_encoder_subsystem& target_video_encoder =
+        use_secondary ? secondary_video_encoder : video_encoder;
+    castor::engine::detail::audio_encoder_subsystem& target_audio_encoder =
+        use_secondary ? secondary_audio_encoder : audio_encoder;
 
+    if (runtime_ready && video_ready && !target_video_encoder.is_configured())
+    {
         castor::engine::detail::video_encoder_lifecycle_result auto_configure_result =
-            video_encoder.configure(&default_encoder_config, runtime_ready, video_ready);
+            auto_configure_video_encoder(target_video_encoder, runtime_ready, video_ready);
 
         if (auto_configure_result.code != CASTOR_ENGINE_OK)
         {
@@ -882,12 +927,12 @@ castor_engine_result_t castor_engine_start_recording(const castor_engine_recordi
         }
     }
 
-    if (video_encoder.is_configured())
+    if (target_video_encoder.is_configured())
     {
         castor_engine_video_encoder_info_t selected_info{};
         selected_info.struct_size = sizeof(selected_info);
 
-        if (video_encoder.get_selected_encoder_info(&selected_info) && selected_info.is_hardware != 0)
+        if (target_video_encoder.get_selected_encoder_info(&selected_info) && selected_info.is_hardware != 0)
         {
             set_last_error(
                 "Recording requires a software video encoder, but the configured video encoder is a hardware "
@@ -926,15 +971,10 @@ castor_engine_result_t castor_engine_start_recording(const castor_engine_recordi
         audio_ready = true;
     }
 
-    if (runtime_ready && audio_ready && !audio_encoder.is_configured())
+    if (runtime_ready && audio_ready && !target_audio_encoder.is_configured())
     {
-        castor_engine_video_encoder_config_t default_audio_encoder_config{};
-        default_audio_encoder_config.struct_size = sizeof(default_audio_encoder_config);
-        default_audio_encoder_config.audio_bitrate = 128;
-        default_audio_encoder_config.audio_track_index = 0;
-
         castor::engine::detail::audio_encoder_lifecycle_result audio_encoder_result =
-            audio_encoder.configure(&default_audio_encoder_config, runtime_ready, audio_ready);
+            auto_configure_audio_encoder(target_audio_encoder, runtime_ready, audio_ready);
 
         if (audio_encoder_result.code != CASTOR_ENGINE_OK)
         {
@@ -944,13 +984,17 @@ castor_engine_result_t castor_engine_start_recording(const castor_engine_recordi
     }
 
     const bool scene_active = runtime_ready && scene_registry.has_active_scene();
-    void* video_encoder_handle = video_encoder.get_native_encoder();
-    void* audio_encoder_handle = audio_encoder.get_native_encoder();
+    void* video_encoder_handle = target_video_encoder.get_native_encoder();
+    void* audio_encoder_handle = target_audio_encoder.get_native_encoder();
 
     castor::engine::detail::recording_lifecycle_result result =
         recording.start(config, runtime_ready, video_ready, scene_active, video_encoder_handle, audio_encoder_handle);
 
-    if (result.code != CASTOR_ENGINE_OK)
+    if (result.code == CASTOR_ENGINE_OK)
+    {
+        recording_encoder_slot = use_secondary ? encoder_slot::secondary : encoder_slot::primary;
+    }
+    else
     {
         set_last_error(std::move(result.message));
     }
@@ -968,7 +1012,15 @@ castor_engine_result_t castor_engine_stop_recording(void)
     if (result.code != CASTOR_ENGINE_OK)
     {
         set_last_error(std::move(result.message));
+        return result.code;
     }
+
+    if (recording_encoder_slot == encoder_slot::secondary)
+    {
+        secondary_video_encoder.reset();
+        secondary_audio_encoder.reset();
+    }
+    recording_encoder_slot = encoder_slot::none;
 
     return result.code;
 }
@@ -1009,11 +1061,51 @@ castor_engine_result_t castor_engine_start_streaming(void)
     std::scoped_lock lock(lifecycle_mutex);
     last_error.clear();
     const bool runtime_ready = obs_initialized() && modules_loaded;
+    const bool video_ready = runtime_ready && video.is_configured();
+    const bool audio_ready = runtime_ready && audio.is_configured();
+
+    // Recording already running on the primary encoders means streaming
+    // cannot safely share them - see the encoder_slot comment above.
+    // Unlike recording, streaming never auto-configures its encoders on
+    // the primary path (callers must configure them explicitly first);
+    // on the secondary path there is no equivalent explicit step yet, so
+    // it auto-configures the same deterministic software-forced defaults
+    // recording does.
+    const bool use_secondary = recording_encoder_slot == encoder_slot::primary;
+    castor::engine::detail::video_encoder_subsystem& target_video_encoder =
+        use_secondary ? secondary_video_encoder : video_encoder;
+    castor::engine::detail::audio_encoder_subsystem& target_audio_encoder =
+        use_secondary ? secondary_audio_encoder : audio_encoder;
+
+    if (use_secondary && video_ready && !target_video_encoder.is_configured())
+    {
+        castor::engine::detail::video_encoder_lifecycle_result auto_configure_result =
+            auto_configure_video_encoder(target_video_encoder, runtime_ready, video_ready);
+        if (auto_configure_result.code != CASTOR_ENGINE_OK)
+        {
+            set_last_error(std::move(auto_configure_result.message));
+            return auto_configure_result.code;
+        }
+    }
+    if (use_secondary && audio_ready && !target_audio_encoder.is_configured())
+    {
+        castor::engine::detail::audio_encoder_lifecycle_result audio_encoder_result =
+            auto_configure_audio_encoder(target_audio_encoder, runtime_ready, audio_ready);
+        if (audio_encoder_result.code != CASTOR_ENGINE_OK)
+        {
+            set_last_error(std::move(audio_encoder_result.message));
+            return audio_encoder_result.code;
+        }
+    }
+
     castor::engine::detail::streaming_lifecycle_result result =
-        streaming.start(runtime_ready, runtime_ready && video.is_configured(), runtime_ready && audio.is_configured(),
-                        runtime_ready && scene_registry.has_active_scene(), video_encoder.get_native_encoder(),
-                        audio_encoder.get_native_encoder());
-    if (result.code != CASTOR_ENGINE_OK)
+        streaming.start(runtime_ready, video_ready, audio_ready, runtime_ready && scene_registry.has_active_scene(),
+                        target_video_encoder.get_native_encoder(), target_audio_encoder.get_native_encoder());
+    if (result.code == CASTOR_ENGINE_OK)
+    {
+        streaming_encoder_slot = use_secondary ? encoder_slot::secondary : encoder_slot::primary;
+    }
+    else
     {
         set_last_error(std::move(result.message));
     }
@@ -1028,7 +1120,16 @@ castor_engine_result_t castor_engine_stop_streaming(void)
     if (result.code != CASTOR_ENGINE_OK)
     {
         set_last_error(std::move(result.message));
+        return result.code;
     }
+
+    if (streaming_encoder_slot == encoder_slot::secondary)
+    {
+        secondary_video_encoder.reset();
+        secondary_audio_encoder.reset();
+    }
+    streaming_encoder_slot = encoder_slot::none;
+
     return result.code;
 }
 
@@ -1310,10 +1411,14 @@ void castor_engine_shutdown(void)
             "The active streaming output did not terminate; shutdown was deferred to preserve encoder ownership.");
         return;
     }
+    streaming_encoder_slot = encoder_slot::none;
     recording.reset();
+    recording_encoder_slot = encoder_slot::none;
     scene_registry.reset();
     video_encoder.reset();
     audio_encoder.reset();
+    secondary_video_encoder.reset();
+    secondary_audio_encoder.reset();
     video.reset();
 
     if (obs_initialized())
