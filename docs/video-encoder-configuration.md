@@ -299,17 +299,16 @@ retrieval.
   holding a handle must never release it itself.
 - **Attachable to more than one output.** Retrieval does not consume or vary
   the handle - repeated calls return the same value, so independent outputs
-  (for example a simultaneous recording and an RTMP stream) can each bind
-  the same encoder.
+  can each bind the same encoder. In practice, [recording](recording.md) and
+  [streaming](streaming.md) only do this when one of them is the *first*
+  output active in a session; whichever starts *second*, while the other is
+  already running, gets its own isolated encoder pair instead - see
+  streaming.md's "Simultaneous recording" section for why sharing a live
+  encoder across two outputs that must be stopped independently turned out
+  to be unsafe.
 - **Invalidated by shutdown or reconfiguration.** The handle becomes invalid
   when the engine shuts down or the corresponding encoder is reconfigured.
   The engine does not track which outputs hold an outstanding handle, so
   any output using one must stop and release itself before engine shutdown
   reaches the point where the encoder itself is released - the reverse
   order leaks or crashes.
-
-This retrieval API is the extent of what this codebase currently does with
-encoder handles: no output type exists here yet to consume one. Building an
-actual output (MKV recording, and later RTMP) - including verifying the
-release-ordering contract above against a real `obs_output_t` - is separate,
-tracked work.

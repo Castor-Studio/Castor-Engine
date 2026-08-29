@@ -109,6 +109,9 @@ fallback) before returning.
 - Stopping while not recording returns `CASTOR_ENGINE_RECORDING_NOT_ACTIVE`.
 - A second recording can be started once the first has been stopped;
   each `StartRecording`/`StopRecording` pair is independent.
+- Recording can run at the same time as [streaming](streaming.md); see that
+  doc's "Simultaneous recording" section for how the two outputs' encoders
+  are isolated from each other when both are active.
 - `castor_engine_shutdown` stops an active recording (waiting for
   finalization the same way `castor_engine_stop_recording` does) and
   releases the output *before* releasing the video and audio encoders it

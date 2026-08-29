@@ -43,8 +43,40 @@ connecting, live, reconnecting, or stopping.
 
 The destination can be configured before the video, audio, encoders, and scene,
 but only after the engine has initialized and loaded its modules. Reconfiguration
-is rejected during a session. Recording and streaming are mutually exclusive in
-this milestone.
+is rejected during a session.
+
+## Simultaneous recording
+
+Streaming and [recording](recording.md) can run at the same time, each
+independently started and stopped. Whichever one starts first uses (and, for
+recording, auto-configures) the primary video/audio encoders described above;
+whichever one starts *second*, while the other is already active, instead
+gets its own isolated pair, auto-configured with the same forced-software
+defaults recording uses. This isolation exists because binding the same live
+`obs_encoder_t` to two started outputs is unsafe to tear down independently -
+even with a confirmed, successful OBS "stop" signal, `obs_output_active()`
+can keep reporting the output as active indefinitely while another encoded
+output remains bound to the shared video pipeline. `castor_engine_stop_streaming`
+therefore trusts the "stop" signal itself rather than re-polling
+`obs_output_active()`, which was found to be unreliable in exactly this
+scenario while validating simultaneous recording and streaming under load.
+
+The isolated pair is released back as soon as the output that claimed it
+stops; it does not require any extra managed API to configure, and it never
+appears in `GetVideoEncoderHandle`/`GetAudioEncoderHandle` or the other
+encoder-configuration accessors, which only ever reflect the primary pair.
+
+## Render statistics
+
+`EngineRuntime.GetRenderStats()` returns engine-wide render/encode pipeline
+counters (`TotalFrames`, `LaggedFrames`, `LaggedFrameRatio`), independent of
+any single output - unlike `GetStreamingHealth`, it is available whenever the
+engine is initialized, whether or not streaming or recording is active. It
+mirrors OBS's own `obs_get_total_frames`/`obs_get_lagged_frames`, the same
+render-loop figures OBS Studio's stats window shows. Use it alongside
+`GetStreamingHealth` to distinguish local render-loop lag (frames the render
+loop couldn't produce on schedule) from RTMP delivery loss (frames dropped
+over the network).
 
 ## Local ingest endpoint
 
@@ -54,6 +86,13 @@ listener without requiring a public streaming account:
 ```powershell
 docker run --rm -it -p 1935:1935 bluenviron/mediamtx:1
 ```
+
+Without Docker, `ffmpeg -listen 1 -i rtmp://127.0.0.1:1935/live/<key> -c copy -f mp4 out.mp4`
+also receives a single RTMP publish and writes it to a file - useful for a
+one-off manual validation run, but it accepts exactly one connection and then
+exits, so it cannot serve `StreamingIntegrationTests`'s own reachability probe
+(a bare TCP connect/disconnect) followed by the real publish; that test still
+needs MediaMTX or an equivalent always-listening endpoint.
 
 Set the integration-test variables in the same shell, without writing the key
 to a tracked file:
