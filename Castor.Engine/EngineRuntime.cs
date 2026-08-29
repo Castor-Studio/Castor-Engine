@@ -708,6 +708,25 @@ namespace Castor.Engine
         }
 
         /// <summary>
+        /// Gets engine-wide render/encode pipeline counters. Available
+        /// whenever the engine is initialized, independent of whether
+        /// recording or streaming is active.
+        /// </summary>
+        public static EngineRenderStats GetRenderStats()
+        {
+            var nativeStats = new NativeEngineRenderStats
+            {
+                StructSize = checked((uint)Marshal.SizeOf<NativeEngineRenderStats>()),
+            };
+            var result = NativeMethods.GetRenderStats(ref nativeStats);
+            if (result != NativeEngineResult.Ok)
+            {
+                throw CreateNativeOperationException("retrieve render stats", result);
+            }
+            return new EngineRenderStats(nativeStats.TotalFrames, nativeStats.LaggedFrames);
+        }
+
+        /// <summary>
         /// Starts recording the active main scene to an MKV file. If no
         /// video encoder is configured yet, one is created automatically in
         /// forced-software mode. The OBS ffmpeg_muxer output this uses

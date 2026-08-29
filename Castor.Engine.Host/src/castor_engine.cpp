@@ -861,12 +861,6 @@ castor_engine_result_t castor_engine_start_recording(const castor_engine_recordi
         return validation_result.code;
     }
 
-    if (streaming.is_active())
-    {
-        set_last_error("Recording cannot start while streaming is active.");
-        return CASTOR_ENGINE_STREAMING_CONFLICTING_OUTPUT_ACTIVE;
-    }
-
     const bool runtime_ready = obs_initialized() && modules_loaded;
     const bool video_ready = runtime_ready && video.is_configured();
 
@@ -1017,8 +1011,8 @@ castor_engine_result_t castor_engine_start_streaming(void)
     const bool runtime_ready = obs_initialized() && modules_loaded;
     castor::engine::detail::streaming_lifecycle_result result =
         streaming.start(runtime_ready, runtime_ready && video.is_configured(), runtime_ready && audio.is_configured(),
-                        runtime_ready && scene_registry.has_active_scene(), recording.is_active(),
-                        video_encoder.get_native_encoder(), audio_encoder.get_native_encoder());
+                        runtime_ready && scene_registry.has_active_scene(), video_encoder.get_native_encoder(),
+                        audio_encoder.get_native_encoder());
     if (result.code != CASTOR_ENGINE_OK)
     {
         set_last_error(std::move(result.message));
@@ -1060,6 +1054,29 @@ castor_engine_result_t castor_engine_get_streaming_health(castor_engine_streamin
         set_last_error(std::move(result.message));
     }
     return result.code;
+}
+
+castor_engine_result_t castor_engine_get_render_stats(castor_engine_render_stats_t* out_stats)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (out_stats == nullptr || out_stats->struct_size < sizeof(castor_engine_render_stats_t))
+    {
+        set_last_error("The render stats pointer must be non-null and its structure large enough.");
+        return CASTOR_ENGINE_INVALID_ARGUMENT;
+    }
+
+    if (!obs_initialized())
+    {
+        set_last_error("The engine must be initialized before render stats are available.");
+        return CASTOR_ENGINE_NOT_INITIALIZED;
+    }
+
+    out_stats->struct_size = sizeof(*out_stats);
+    out_stats->total_frames = static_cast<uint64_t>(obs_get_total_frames());
+    out_stats->lagged_frames = static_cast<uint64_t>(obs_get_lagged_frames());
+    return CASTOR_ENGINE_OK;
 }
 
 castor_engine_result_t castor_engine_create_scene(const char* scene_name)

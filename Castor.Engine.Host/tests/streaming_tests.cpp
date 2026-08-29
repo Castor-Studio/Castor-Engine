@@ -217,7 +217,7 @@ bool lifecycle_reports_states_health_and_cleanup_order()
     int video_encoder = 0;
     int audio_encoder = 0;
     if (subsystem.configure(&value, true).code != CASTOR_ENGINE_OK ||
-        subsystem.start(true, true, true, true, false, &video_encoder, &audio_encoder).code != CASTOR_ENGINE_OK)
+        subsystem.start(true, true, true, true, &video_encoder, &audio_encoder).code != CASTOR_ENGINE_OK)
     {
         return false;
     }
@@ -235,7 +235,7 @@ bool lifecycle_reports_states_health_and_cleanup_order()
     const auto service_release = std::find(backend.events.begin(), backend.events.end(), "release_service");
     const bool cleanup_order = output_release < service_release;
     const bool repeated =
-        subsystem.start(true, true, true, true, false, &video_encoder, &audio_encoder).code == CASTOR_ENGINE_OK &&
+        subsystem.start(true, true, true, true, &video_encoder, &audio_encoder).code == CASTOR_ENGINE_OK &&
         subsystem.stop().code == CASTOR_ENGINE_OK;
     return expect(live.state == CASTOR_ENGINE_STREAMING_LIVE, "start signal reports live") &&
            expect(health_result.code == CASTOR_ENGINE_OK && health.total_frames == 120 && health.dropped_frames == 3,
@@ -269,7 +269,7 @@ bool failures_are_mapped_and_secrets_redacted()
         int video_encoder = 0;
         int audio_encoder = 0;
         subsystem.configure(&value, true);
-        subsystem.start(true, true, true, true, false, &video_encoder, &audio_encoder);
+        subsystem.start(true, true, true, true, &video_encoder, &audio_encoder);
         backend.error = "failure includes sentinel-key and sentinel-password";
         backend.output_active = false;
         backend.emit(streaming_event::stopped, reason);
@@ -290,7 +290,7 @@ bool failures_are_mapped_and_secrets_redacted()
     auto value = config();
     int encoder = 0;
     reconnect_subsystem.configure(&value, true);
-    reconnect_subsystem.start(true, true, true, true, false, &encoder, &encoder);
+    reconnect_subsystem.start(true, true, true, true, &encoder, &encoder);
     reconnect_backend.emit(streaming_event::reconnecting);
     reconnect_backend.output_active = false;
     reconnect_backend.emit(streaming_event::stopped, streaming_stop_reason::connect_failed);
@@ -308,7 +308,7 @@ bool creation_attachment_and_start_failures_are_explicit()
         auto value = config();
         int encoder = 0;
         subsystem.configure(&value, true);
-        const auto result = subsystem.start(true, true, true, true, false, &encoder, &encoder);
+        const auto result = subsystem.start(true, true, true, true, &encoder, &encoder);
         return result.code == expected && status(subsystem).state == CASTOR_ENGINE_STREAMING_FAILED;
     };
 
@@ -337,16 +337,15 @@ bool invalid_lifecycle_operations_are_explicit()
     streaming_subsystem subsystem(backend);
     auto value = config();
     int encoder = 0;
-    const auto no_configuration = subsystem.start(true, true, true, true, false, &encoder, &encoder);
+    const auto no_configuration = subsystem.start(true, true, true, true, &encoder, &encoder);
     subsystem.configure(&value, true);
-    const auto missing_video = subsystem.start(true, false, true, true, false, &encoder, &encoder);
-    const auto missing_audio = subsystem.start(true, true, false, true, false, &encoder, &encoder);
-    const auto missing_encoder = subsystem.start(true, true, true, true, false, nullptr, &encoder);
-    const auto missing_scene = subsystem.start(true, true, true, false, false, &encoder, &encoder);
-    const auto recording_conflict = subsystem.start(true, true, true, true, true, &encoder, &encoder);
+    const auto missing_video = subsystem.start(true, false, true, true, &encoder, &encoder);
+    const auto missing_audio = subsystem.start(true, true, false, true, &encoder, &encoder);
+    const auto missing_encoder = subsystem.start(true, true, true, true, nullptr, &encoder);
+    const auto missing_scene = subsystem.start(true, true, true, false, &encoder, &encoder);
     const auto inactive_stop = subsystem.stop();
-    subsystem.start(true, true, true, true, false, &encoder, &encoder);
-    const auto duplicate_start = subsystem.start(true, true, true, true, false, &encoder, &encoder);
+    subsystem.start(true, true, true, true, &encoder, &encoder);
+    const auto duplicate_start = subsystem.start(true, true, true, true, &encoder, &encoder);
     const auto identical_reconfigure = subsystem.configure(&value, true);
     auto replacement = config("replacement-key");
     const auto reconfigure = subsystem.configure(&replacement, true);
@@ -356,8 +355,6 @@ bool invalid_lifecycle_operations_are_explicit()
            expect(missing_audio.code == CASTOR_ENGINE_AUDIO_NOT_CONFIGURED, "audio is required") &&
            expect(missing_encoder.code == CASTOR_ENGINE_STREAMING_ENCODERS_NOT_CONFIGURED, "encoders are required") &&
            expect(missing_scene.code == CASTOR_ENGINE_STREAMING_NO_ACTIVE_SCENE, "scene is required") &&
-           expect(recording_conflict.code == CASTOR_ENGINE_STREAMING_CONFLICTING_OUTPUT_ACTIVE,
-                  "recording conflict is explicit") &&
            expect(inactive_stop.code == CASTOR_ENGINE_STREAMING_NOT_ACTIVE, "inactive stop is rejected") &&
            expect(duplicate_start.code == CASTOR_ENGINE_STREAMING_ALREADY_ACTIVE, "duplicate start is rejected") &&
            expect(identical_reconfigure.code == CASTOR_ENGINE_OK, "identical active configuration is idempotent") &&
@@ -372,7 +369,7 @@ bool reset_stops_before_releasing_resources()
     auto value = config();
     int encoder = 0;
     subsystem.configure(&value, true);
-    subsystem.start(true, true, true, true, false, &encoder, &encoder);
+    subsystem.start(true, true, true, true, &encoder, &encoder);
 
     const bool reset = subsystem.reset();
     const auto stop = std::find(backend.events.begin(), backend.events.end(), "stop");
@@ -382,7 +379,7 @@ bool reset_stops_before_releasing_resources()
            expect(stop < output_release && output_release < service_release,
                   "reset stops, then releases output before service") &&
            expect(status(subsystem).state == CASTOR_ENGINE_STREAMING_IDLE, "reset returns to idle") &&
-           expect(subsystem.start(true, true, true, true, false, &encoder, &encoder).code ==
+           expect(subsystem.start(true, true, true, true, &encoder, &encoder).code ==
                       CASTOR_ENGINE_STREAMING_NOT_CONFIGURED,
                   "reset clears the destination");
 }

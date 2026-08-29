@@ -105,8 +105,7 @@ streaming_lifecycle_result streaming_subsystem::configure(const castor_engine_st
 }
 
 streaming_lifecycle_result streaming_subsystem::start(bool runtime_ready, bool video_ready, bool audio_ready,
-                                                      bool scene_active, bool recording_active, void* video_encoder,
-                                                      void* audio_encoder)
+                                                      bool scene_active, void* video_encoder, void* audio_encoder)
 {
     {
         std::scoped_lock lock(mutex_);
@@ -143,11 +142,6 @@ streaming_lifecycle_result streaming_subsystem::start(bool runtime_ready, bool v
     if (!scene_active)
     {
         return failure(CASTOR_ENGINE_STREAMING_NO_ACTIVE_SCENE, "A scene must be active before streaming can start.");
-    }
-    if (recording_active)
-    {
-        return failure(CASTOR_ENGINE_STREAMING_CONFLICTING_OUTPUT_ACTIVE,
-                       "Streaming cannot start while recording is active.");
     }
 
     release_resources();
