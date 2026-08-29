@@ -70,10 +70,12 @@ namespace Castor.Engine.Tests
                 () => EngineRuntime.ConfigureStreaming(
                     new EngineStreamingConfiguration(server!, key + "-replacement"))).Message);
 
-            // Recording and streaming share the same encoders and are no
-            // longer mutually exclusive: starting a recording while
-            // streaming is live must succeed, both outputs bound to the
-            // same video/audio encoders.
+            // Recording and streaming are no longer mutually exclusive:
+            // starting a recording while streaming is live must succeed.
+            // Streaming already owns the primary encoders configured above,
+            // so recording auto-configures its own isolated secondary pair
+            // instead of sharing them - see castor_engine.cpp's
+            // encoder_slot tracking.
             var recordingPath = Path.Combine(Path.GetTempPath(), $"stream-and-record-{Guid.NewGuid():N}.mkv");
             EngineRuntime.StartRecording(new EngineRecordingConfiguration(recordingPath));
             Assert.True(EngineRuntime.IsRecordingActive);
