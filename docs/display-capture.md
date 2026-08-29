@@ -45,6 +45,9 @@ background scene's source ahead of a later
 [`SwitchScene`](scene-management.md) call is the normal way to get it ready
 before it goes on air.
 
+The configured capture's position, scale, rotation, bounds, and crop can then
+be changed live through [Scene Item Transforms](scene-item-transforms.md).
+
 The UI that presents this list and persists the user's choice belongs to the
 frontend. The engine only provides enumeration, validation, configuration, and
 lifecycle ownership.
@@ -120,5 +123,6 @@ An unknown scene name is rejected with `CASTOR_ENGINE_SCENE_NOT_FOUND`.
 ## Scope
 
 This feature intentionally does not implement window capture, simultaneous
-multi-display capture, scaling, cropping, preview rendering, hardware encoder
-selection, or frontend display-selection controls.
+multi-display capture, preview rendering, hardware encoder selection, or
+frontend display-selection controls. Scaling and cropping are provided by the
+separate scene-item transform API.

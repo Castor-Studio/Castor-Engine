@@ -14,6 +14,7 @@ namespace
 constexpr const char* display_source_unversioned_id = "monitor_capture";
 constexpr const char* display_source_name = "Castor Main Display Capture";
 constexpr const char* transition_name = "Castor Scene Transition";
+constexpr const char* absolute_coordinates_setting = "AbsoluteCoordinates";
 constexpr uint32_t main_output_channel = 0;
 
 obs_scene_t* as_scene(void* scene) noexcept
@@ -29,6 +30,50 @@ obs_source_t* as_source(void* source) noexcept
 obs_sceneitem_t* as_scene_item(void* scene_item) noexcept
 {
     return static_cast<obs_sceneitem_t*>(scene_item);
+}
+
+obs_bounds_type to_obs_bounds_type(uint32_t mode) noexcept
+{
+    switch (mode)
+    {
+    case CASTOR_ENGINE_SCENE_ITEM_BOUNDS_STRETCH:
+        return OBS_BOUNDS_STRETCH;
+    case CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_INNER:
+        return OBS_BOUNDS_SCALE_INNER;
+    case CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_OUTER:
+        return OBS_BOUNDS_SCALE_OUTER;
+    case CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_TO_WIDTH:
+        return OBS_BOUNDS_SCALE_TO_WIDTH;
+    case CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_TO_HEIGHT:
+        return OBS_BOUNDS_SCALE_TO_HEIGHT;
+    case CASTOR_ENGINE_SCENE_ITEM_BOUNDS_MAX_ONLY:
+        return OBS_BOUNDS_MAX_ONLY;
+    case CASTOR_ENGINE_SCENE_ITEM_BOUNDS_NONE:
+    default:
+        return OBS_BOUNDS_NONE;
+    }
+}
+
+castor_engine_scene_item_bounds_mode_t from_obs_bounds_type(obs_bounds_type type) noexcept
+{
+    switch (type)
+    {
+    case OBS_BOUNDS_STRETCH:
+        return CASTOR_ENGINE_SCENE_ITEM_BOUNDS_STRETCH;
+    case OBS_BOUNDS_SCALE_INNER:
+        return CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_INNER;
+    case OBS_BOUNDS_SCALE_OUTER:
+        return CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_OUTER;
+    case OBS_BOUNDS_SCALE_TO_WIDTH:
+        return CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_TO_WIDTH;
+    case OBS_BOUNDS_SCALE_TO_HEIGHT:
+        return CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_TO_HEIGHT;
+    case OBS_BOUNDS_MAX_ONLY:
+        return CASTOR_ENGINE_SCENE_ITEM_BOUNDS_MAX_ONLY;
+    case OBS_BOUNDS_NONE:
+    default:
+        return CASTOR_ENGINE_SCENE_ITEM_BOUNDS_NONE;
+    }
 }
 
 const char* transition_type_id(castor_engine_scene_transition_type_t type) noexcept
@@ -76,6 +121,21 @@ constexpr std::chrono::milliseconds transition_poll_interval{10};
 
 void* obs_scene_backend::create_scene(const char* name) noexcept
 {
+    // OBS scenes normally store item positions relative to the base canvas and
+    // nudge the converted absolute values on readback. Castor's public contract
+    // exposes the stored pixel values verbatim, so opt its owned scenes into
+    // OBS's absolute-coordinate mode before they are created.
+    obs_data_t* private_settings = obs_data_create();
+
+    if (private_settings == nullptr)
+    {
+        return nullptr;
+    }
+
+    obs_data_set_bool(private_settings, absolute_coordinates_setting, true);
+    obs_apply_private_data(private_settings);
+    obs_data_release(private_settings);
+
     return obs_scene_create(name);
 }
 
@@ -146,6 +206,55 @@ void* obs_scene_backend::add_source_to_scene(void* scene, void* source) noexcept
 void obs_scene_backend::remove_source_from_scene(void* scene_item) noexcept
 {
     obs_sceneitem_remove(as_scene_item(scene_item));
+}
+
+void obs_scene_backend::get_scene_item_transform(void* scene_item,
+                                                 castor_engine_scene_item_transform_t& out_transform) noexcept
+{
+    obs_transform_info info{};
+    obs_sceneitem_crop crop{};
+    obs_sceneitem_t* item = as_scene_item(scene_item);
+
+    obs_sceneitem_get_info2(item, &info);
+    obs_sceneitem_get_crop(item, &crop);
+
+    out_transform.position_x = info.pos.x;
+    out_transform.position_y = info.pos.y;
+    out_transform.scale_x = info.scale.x;
+    out_transform.scale_y = info.scale.y;
+    out_transform.rotation_degrees = info.rot;
+    out_transform.bounds_mode = static_cast<uint32_t>(from_obs_bounds_type(info.bounds_type));
+    out_transform.bounds_width = info.bounds.x;
+    out_transform.bounds_height = info.bounds.y;
+    out_transform.crop_left = static_cast<uint32_t>(crop.left);
+    out_transform.crop_top = static_cast<uint32_t>(crop.top);
+    out_transform.crop_right = static_cast<uint32_t>(crop.right);
+    out_transform.crop_bottom = static_cast<uint32_t>(crop.bottom);
+}
+
+void obs_scene_backend::set_scene_item_transform(void* scene_item,
+                                                 const castor_engine_scene_item_transform_t& transform) noexcept
+{
+    obs_sceneitem_t* item = as_scene_item(scene_item);
+    obs_transform_info info{};
+    obs_sceneitem_get_info2(item, &info);
+
+    info.pos.x = transform.position_x;
+    info.pos.y = transform.position_y;
+    info.scale.x = transform.scale_x;
+    info.scale.y = transform.scale_y;
+    info.rot = transform.rotation_degrees;
+    info.bounds_type = to_obs_bounds_type(transform.bounds_mode);
+    info.bounds.x = transform.bounds_width;
+    info.bounds.y = transform.bounds_height;
+
+    const obs_sceneitem_crop crop{static_cast<int>(transform.crop_left), static_cast<int>(transform.crop_top),
+                                  static_cast<int>(transform.crop_right), static_cast<int>(transform.crop_bottom)};
+
+    obs_sceneitem_defer_update_begin(item);
+    obs_sceneitem_set_info2(item, &info);
+    obs_sceneitem_set_crop(item, &crop);
+    obs_sceneitem_defer_update_end(item);
 }
 
 void obs_scene_backend::set_output_source(void* source) noexcept

@@ -1,6 +1,8 @@
 #include "scene_registry.h"
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <utility>
 
 namespace castor::engine::detail
@@ -15,6 +17,54 @@ scene_registry_result failure(castor_engine_result_t code, std::string message)
 bool is_blank(const char* value) noexcept
 {
     return value == nullptr || value[0] == '\0';
+}
+
+scene_registry_result validate_transform(const castor_engine_scene_item_transform_t& transform)
+{
+    if (transform.struct_size < sizeof(castor_engine_scene_item_transform_t))
+    {
+        return failure(CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+                       "The scene item transform structure is too small. Expected at least " +
+                           std::to_string(sizeof(castor_engine_scene_item_transform_t)) + " bytes, received " +
+                           std::to_string(transform.struct_size) + ".");
+    }
+
+    if (!std::isfinite(transform.position_x) || !std::isfinite(transform.position_y) ||
+        !std::isfinite(transform.scale_x) || !std::isfinite(transform.scale_y) ||
+        !std::isfinite(transform.rotation_degrees) || !std::isfinite(transform.bounds_width) ||
+        !std::isfinite(transform.bounds_height))
+    {
+        return failure(CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+                       "Scene item transform values must be finite numbers.");
+    }
+
+    if (transform.bounds_mode > CASTOR_ENGINE_SCENE_ITEM_BOUNDS_MAX_ONLY)
+    {
+        return failure(CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM, "The scene item bounds mode is not recognized.");
+    }
+
+    if (transform.bounds_width < 0.0F || transform.bounds_height < 0.0F)
+    {
+        return failure(CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+                       "Scene item bounds dimensions must not be negative.");
+    }
+
+    if (transform.bounds_mode != CASTOR_ENGINE_SCENE_ITEM_BOUNDS_NONE &&
+        (transform.bounds_width <= 0.0F || transform.bounds_height <= 0.0F))
+    {
+        return failure(CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+                       "Scene item bounds dimensions must be positive when bounds are enabled.");
+    }
+
+    constexpr uint32_t maximum_crop = static_cast<uint32_t>(std::numeric_limits<int32_t>::max());
+
+    if (transform.crop_left > maximum_crop || transform.crop_top > maximum_crop ||
+        transform.crop_right > maximum_crop || transform.crop_bottom > maximum_crop)
+    {
+        return failure(CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM, "Scene item crop values must not exceed INT32_MAX.");
+    }
+
+    return {CASTOR_ENGINE_OK, {}};
 }
 } // namespace
 
@@ -266,6 +316,72 @@ bool scene_registry_subsystem::is_display_capture_active(const char* scene_name)
 {
     const scene_entry* entry = find(scene_name);
     return entry != nullptr && entry->display_capture_active;
+}
+
+scene_registry_result scene_registry_subsystem::get_scene_item_transform(
+    const char* scene_name, castor_engine_scene_item_transform_t& out_transform)
+{
+    if (is_blank(scene_name))
+    {
+        return failure(CASTOR_ENGINE_SCENE_INVALID_NAME, "A scene name must be a non-empty string.");
+    }
+
+    if (out_transform.struct_size < sizeof(castor_engine_scene_item_transform_t))
+    {
+        return failure(CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM,
+                       "The output scene item transform structure is too small. Expected at least " +
+                           std::to_string(sizeof(castor_engine_scene_item_transform_t)) + " bytes, received " +
+                           std::to_string(out_transform.struct_size) + ".");
+    }
+
+    scene_entry* entry = find(scene_name);
+
+    if (entry == nullptr)
+    {
+        return failure(CASTOR_ENGINE_SCENE_NOT_FOUND, "No scene named '" + std::string(scene_name) + "' exists.");
+    }
+
+    if (entry->scene_item == nullptr)
+    {
+        return failure(CASTOR_ENGINE_SCENE_ITEM_NOT_FOUND,
+                       "Scene '" + entry->name + "' does not have a visual item to transform.");
+    }
+
+    backend_.get_scene_item_transform(entry->scene_item, out_transform);
+    out_transform.struct_size = sizeof(castor_engine_scene_item_transform_t);
+    return {CASTOR_ENGINE_OK, {}};
+}
+
+scene_registry_result scene_registry_subsystem::set_scene_item_transform(
+    const char* scene_name, const castor_engine_scene_item_transform_t& transform)
+{
+    if (is_blank(scene_name))
+    {
+        return failure(CASTOR_ENGINE_SCENE_INVALID_NAME, "A scene name must be a non-empty string.");
+    }
+
+    scene_registry_result validation = validate_transform(transform);
+
+    if (validation.code != CASTOR_ENGINE_OK)
+    {
+        return validation;
+    }
+
+    scene_entry* entry = find(scene_name);
+
+    if (entry == nullptr)
+    {
+        return failure(CASTOR_ENGINE_SCENE_NOT_FOUND, "No scene named '" + std::string(scene_name) + "' exists.");
+    }
+
+    if (entry->scene_item == nullptr)
+    {
+        return failure(CASTOR_ENGINE_SCENE_ITEM_NOT_FOUND,
+                       "Scene '" + entry->name + "' does not have a visual item to transform.");
+    }
+
+    backend_.set_scene_item_transform(entry->scene_item, transform);
+    return {CASTOR_ENGINE_OK, {}};
 }
 
 scene_registry_result scene_registry_subsystem::switch_scene(const char* name,

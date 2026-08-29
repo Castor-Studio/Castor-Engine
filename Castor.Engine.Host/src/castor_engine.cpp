@@ -1213,6 +1213,64 @@ castor_engine_result_t castor_engine_switch_scene(const char* scene_name,
     }
 }
 
+castor_engine_result_t castor_engine_get_scene_item_transform(const char* scene_name,
+                                                              castor_engine_scene_item_transform_t* out_transform)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (out_transform == nullptr)
+    {
+        set_last_error("The output scene item transform pointer must not be null.");
+        return CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM;
+    }
+
+    if (!obs_initialized() || !modules_loaded)
+    {
+        set_last_error("The engine must be initialized before a scene item transform can be read.");
+        return CASTOR_ENGINE_NOT_INITIALIZED;
+    }
+
+    castor::engine::detail::scene_registry_result result =
+        scene_registry.get_scene_item_transform(scene_name, *out_transform);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
+castor_engine_result_t castor_engine_set_scene_item_transform(const char* scene_name,
+                                                              const castor_engine_scene_item_transform_t* transform)
+{
+    std::scoped_lock lock(lifecycle_mutex);
+    last_error.clear();
+
+    if (transform == nullptr)
+    {
+        set_last_error("The scene item transform pointer must not be null.");
+        return CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM;
+    }
+
+    if (!obs_initialized() || !modules_loaded)
+    {
+        set_last_error("The engine must be initialized before a scene item transform can be applied.");
+        return CASTOR_ENGINE_NOT_INITIALIZED;
+    }
+
+    castor::engine::detail::scene_registry_result result =
+        scene_registry.set_scene_item_transform(scene_name, *transform);
+
+    if (result.code != CASTOR_ENGINE_OK)
+    {
+        set_last_error(std::move(result.message));
+    }
+
+    return result.code;
+}
+
 uint8_t castor_engine_has_active_scene(void)
 {
     std::scoped_lock lock(lifecycle_mutex);

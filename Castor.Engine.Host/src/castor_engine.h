@@ -17,7 +17,7 @@ extern "C"
 {
 #endif
 
-#define CASTOR_ENGINE_ABI_VERSION 12
+#define CASTOR_ENGINE_ABI_VERSION 13
 #define CASTOR_ENGINE_VERSION "0.1.0-alpha.1"
 
     CASTOR_ENGINE_API uint32_t castor_engine_get_abi_version(void);
@@ -119,6 +119,9 @@ extern "C"
         CASTOR_ENGINE_SCENE_TRANSITION_UNAVAILABLE = 70,
         CASTOR_ENGINE_SCENE_TRANSITION_CREATION_FAILED = 71,
         CASTOR_ENGINE_SCENE_TRANSITION_START_FAILED = 72,
+
+        CASTOR_ENGINE_SCENE_ITEM_NOT_FOUND = 73,
+        CASTOR_ENGINE_SCENE_ITEM_INVALID_TRANSFORM = 74,
     } castor_engine_result_t;
 
     typedef enum castor_engine_streaming_state
@@ -145,6 +148,22 @@ extern "C"
         CASTOR_ENGINE_SCENE_TRANSITION_SLIDE = 2,
         CASTOR_ENGINE_SCENE_TRANSITION_SWIPE = 3,
     } castor_engine_scene_transition_type_t;
+
+    /**
+     * Controls how a scene item's source is fitted inside its bounds.
+     *
+     * These values belong to Castor Engine; no OBS enum crosses the ABI.
+     */
+    typedef enum castor_engine_scene_item_bounds_mode
+    {
+        CASTOR_ENGINE_SCENE_ITEM_BOUNDS_NONE = 0,
+        CASTOR_ENGINE_SCENE_ITEM_BOUNDS_STRETCH = 1,
+        CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_INNER = 2,
+        CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_OUTER = 3,
+        CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_TO_WIDTH = 4,
+        CASTOR_ENGINE_SCENE_ITEM_BOUNDS_SCALE_TO_HEIGHT = 5,
+        CASTOR_ENGINE_SCENE_ITEM_BOUNDS_MAX_ONLY = 6,
+    } castor_engine_scene_item_bounds_mode_t;
 
     typedef enum castor_engine_video_encoder_selection_mode
     {
@@ -268,6 +287,29 @@ extern "C"
         uint32_t type;
         uint32_t duration_ms;
     } castor_engine_scene_transition_config_t;
+
+    /**
+     * A versioned snapshot of a scene's single visual item transform.
+     *
+     * Position and bounds use base-canvas pixels. Scale is unitless, rotation
+     * uses degrees, and crop values use unscaled source pixels.
+     */
+    typedef struct castor_engine_scene_item_transform
+    {
+        uint32_t struct_size;
+        float position_x;
+        float position_y;
+        float scale_x;
+        float scale_y;
+        float rotation_degrees;
+        uint32_t bounds_mode;
+        float bounds_width;
+        float bounds_height;
+        uint32_t crop_left;
+        uint32_t crop_top;
+        uint32_t crop_right;
+        uint32_t crop_bottom;
+    } castor_engine_scene_item_transform_t;
 
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_initialize(const castor_engine_config_t* config);
 
@@ -612,6 +654,21 @@ extern "C"
      */
     CASTOR_ENGINE_API castor_engine_result_t
     castor_engine_switch_scene(const char* scene_name, const castor_engine_scene_transition_config_t* transition);
+
+    /**
+     * Reads the stored transform of the named scene's visual item.
+     *
+     * The caller must initialize out_transform->struct_size before calling.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t
+    castor_engine_get_scene_item_transform(const char* scene_name, castor_engine_scene_item_transform_t* out_transform);
+
+    /**
+     * Atomically applies a complete transform snapshot to the named scene's
+     * visual item without replacing the item or its source.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_set_scene_item_transform(
+        const char* scene_name, const castor_engine_scene_item_transform_t* transform);
 
     CASTOR_ENGINE_API uint8_t castor_engine_has_active_scene(void);
 
