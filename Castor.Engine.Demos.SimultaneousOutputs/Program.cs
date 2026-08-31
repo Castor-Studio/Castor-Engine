@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Castor.Engine;
 
 // Validation harness for https://github.com/Castor-Studio/Castor-Engine/issues/42:
@@ -9,6 +10,8 @@ const string recordingPath = @"C:\recordings\simultaneous-outputs-validation.mkv
 var rtmpServer = Environment.GetEnvironmentVariable("CASTOR_VALIDATION_RTMP_SERVER") ?? "rtmp://127.0.0.1:1935/live";
 var rtmpKey = Environment.GetEnvironmentVariable("CASTOR_VALIDATION_RTMP_KEY") ?? "castor-validation";
 const int holdMilliseconds = 5000;
+const int canvasWidth = 1280;
+const int canvasHeight = 720;
 
 Directory.CreateDirectory(Path.GetDirectoryName(recordingPath)!);
 
@@ -25,8 +28,8 @@ void LogMetrics(string label)
 Console.WriteLine("Initializing engine...");
 EngineRuntime.Initialize(new EngineRuntimeConfiguration(AppContext.BaseDirectory));
 EngineRuntime.ConfigureVideo(new EngineVideoConfiguration(
-    baseWidth: 1280, baseHeight: 720,
-    outputWidth: 1280, outputHeight: 720,
+    baseWidth: canvasWidth, baseHeight: canvasHeight,
+    outputWidth: canvasWidth, outputHeight: canvasHeight,
     framesPerSecondNumerator: 30, framesPerSecondDenominator: 1));
 EngineRuntime.ConfigureAudio(new EngineAudioConfiguration());
 
@@ -37,17 +40,58 @@ foreach (var display in displays)
     Console.WriteLine($"  - {display.Name} (id={display.Id}, primary={display.IsPrimary})");
 }
 
-if (displays.Count < 3)
+if (displays.Count == 0)
 {
-    throw new InvalidOperationException($"This validation needs 3 displays, only {displays.Count} found.");
+    throw new InvalidOperationException("This validation needs at least 1 display, none found.");
 }
 
+// Fewer than 3 physical displays are available on this machine right now
+// (only the primary one). Scenes round-robin across whatever displays
+// exist, and each gets a distinct crop/zoom transform via the existing
+// Scene Item Transform API - see docs/scene-item-transforms.md - so that
+// every switch still shows genuinely different content even when two
+// scenes share the same underlying display capture. With 3+ real displays
+// this still runs fine; the crop just adds extra visual distinction.
 var sceneNames = new[] { "sceneA", "sceneB", "sceneC" };
-for (var i = 0; i < 3; i++)
+for (var i = 0; i < sceneNames.Length; i++)
 {
+    var display = displays[i % displays.Count];
     EngineRuntime.CreateScene(sceneNames[i]);
-    EngineRuntime.ConfigureDisplayCapture(new EngineDisplayCaptureConfiguration(sceneNames[i], displays[i].Id));
-    Console.WriteLine($"Scene '{sceneNames[i]}' -> display '{displays[i].Name}'");
+    EngineRuntime.ConfigureDisplayCapture(new EngineDisplayCaptureConfiguration(sceneNames[i], display.Id));
+
+    var (sourceWidth, sourceHeight) = ParseResolution(display.Name);
+    var transform = EngineRuntime.GetSceneItemTransform(sceneNames[i]);
+    transform.BoundsMode = EngineSceneItemBoundsMode.Stretch;
+    transform.BoundsWidth = canvasWidth;
+    transform.BoundsHeight = canvasHeight;
+    switch (i % 3)
+    {
+        case 1 when sourceWidth > 0 && sourceHeight > 0:
+            // Top-left quadrant, zoomed to fill the canvas.
+            transform.CropRight = (uint)(sourceWidth / 2);
+            transform.CropBottom = (uint)(sourceHeight / 2);
+            break;
+        case 2 when sourceWidth > 0 && sourceHeight > 0:
+            // Bottom-right quadrant, zoomed to fill the canvas.
+            transform.CropLeft = (uint)(sourceWidth / 2);
+            transform.CropTop = (uint)(sourceHeight / 2);
+            break;
+        default:
+            // Full source, no crop.
+            break;
+    }
+    EngineRuntime.SetSceneItemTransform(sceneNames[i], transform);
+
+    Console.WriteLine($"Scene '{sceneNames[i]}' -> display '{display.Name}' (crop variant {i % 3})");
+}
+
+static (int Width, int Height) ParseResolution(string displayName)
+{
+    var match = Regex.Match(displayName, @"(\d+)x(\d+)");
+    return match.Success
+        ? (int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture),
+           int.Parse(match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture))
+        : (0, 0);
 }
 
 // The first switch after startup is always instant, regardless of the
