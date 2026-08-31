@@ -17,7 +17,7 @@ extern "C"
 {
 #endif
 
-#define CASTOR_ENGINE_ABI_VERSION 13
+#define CASTOR_ENGINE_ABI_VERSION 14
 #define CASTOR_ENGINE_VERSION "0.1.0-alpha.1"
 
     CASTOR_ENGINE_API uint32_t castor_engine_get_abi_version(void);
@@ -100,6 +100,11 @@ extern "C"
         CASTOR_ENGINE_STREAMING_ALREADY_ACTIVE = 52,
         CASTOR_ENGINE_STREAMING_NOT_ACTIVE = 53,
         CASTOR_ENGINE_STREAMING_RECONFIGURATION_WHILE_ACTIVE = 54,
+        /* Recording and streaming were mutually exclusive when this value
+         * was introduced; they now run simultaneously off the same shared
+         * encoders (see castor_engine_start_recording and
+         * castor_engine_start_streaming). Kept defined and unused for the
+         * same reason as 17-20 and 42 above. */
         CASTOR_ENGINE_STREAMING_CONFLICTING_OUTPUT_ACTIVE = 55,
         CASTOR_ENGINE_STREAMING_START_FAILED = 56,
         CASTOR_ENGINE_STREAMING_CONNECTION_FAILED = 57,
@@ -556,6 +561,20 @@ extern "C"
     } castor_engine_streaming_health_t;
 
     /**
+     * Engine-wide render/encode pipeline counters, independent of any
+     * single output. total_frames is every frame the video pipeline has
+     * presented since OBS started; lagged_frames is how many of those the
+     * render loop could not produce in time (source of the "skipped/lagged
+     * frames" figure OBS Studio's own stats window shows).
+     */
+    typedef struct castor_engine_render_stats
+    {
+        uint32_t struct_size;
+        uint64_t total_frames;
+        uint64_t lagged_frames;
+    } castor_engine_render_stats_t;
+
+    /**
      * Validates a recording configuration in isolation. This does not
      * require the engine or OBS to be initialized and does not start a
      * recording.
@@ -606,6 +625,16 @@ extern "C"
 
     CASTOR_ENGINE_API castor_engine_result_t
     castor_engine_get_streaming_health(castor_engine_streaming_health_t* out_health);
+
+    /**
+     * Retrieves engine-wide render/encode pipeline counters. The caller
+     * must set struct_size before calling. Available whenever OBS is
+     * running, independent of whether recording or streaming is active -
+     * unlike castor_engine_get_streaming_health, this is not scoped to a
+     * single output. Returns CASTOR_ENGINE_NOT_INITIALIZED if the engine
+     * has not been initialized.
+     */
+    CASTOR_ENGINE_API castor_engine_result_t castor_engine_get_render_stats(castor_engine_render_stats_t* out_stats);
 
     /** Creates an empty named scene. Scene creation has no fixed count limit. */
     CASTOR_ENGINE_API castor_engine_result_t castor_engine_create_scene(const char* scene_name);

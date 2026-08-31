@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <utility>
 
@@ -105,8 +106,7 @@ streaming_lifecycle_result streaming_subsystem::configure(const castor_engine_st
 }
 
 streaming_lifecycle_result streaming_subsystem::start(bool runtime_ready, bool video_ready, bool audio_ready,
-                                                      bool scene_active, bool recording_active, void* video_encoder,
-                                                      void* audio_encoder)
+                                                      bool scene_active, void* video_encoder, void* audio_encoder)
 {
     {
         std::scoped_lock lock(mutex_);
@@ -143,11 +143,6 @@ streaming_lifecycle_result streaming_subsystem::start(bool runtime_ready, bool v
     if (!scene_active)
     {
         return failure(CASTOR_ENGINE_STREAMING_NO_ACTIVE_SCENE, "A scene must be active before streaming can start.");
-    }
-    if (recording_active)
-    {
-        return failure(CASTOR_ENGINE_STREAMING_CONFLICTING_OUTPUT_ACTIVE,
-                       "Streaming cannot start while recording is active.");
     }
 
     release_resources();
@@ -221,24 +216,34 @@ streaming_lifecycle_result streaming_subsystem::stop()
     }
 
     backend_.stop(output);
+    bool signaled = false;
     {
         std::unique_lock lock(mutex_);
-        stopped_condition_.wait_for(lock, graceful_stop_timeout, [this] { return !active_state(state_); });
+        signaled = stopped_condition_.wait_for(lock, graceful_stop_timeout, [this] { return !active_state(state_); });
     }
-    if (backend_.active(output))
+    if (!signaled)
     {
         backend_.force_stop(output);
         std::unique_lock lock(mutex_);
-        stopped_condition_.wait_for(lock, forced_stop_timeout, [this] { return !active_state(state_); });
+        signaled = stopped_condition_.wait_for(lock, forced_stop_timeout, [this] { return !active_state(state_); });
     }
-    if (backend_.active(output))
+    if (!signaled)
     {
         const std::string message = "The RTMP output did not terminate after a forced stop request.";
         set_failure(CASTOR_ENGINE_STREAMING_STOP_TIMEOUT, message);
         return failure(CASTOR_ENGINE_STREAMING_STOP_TIMEOUT, message);
     }
 
-    release_resources();
+    // obs_output_active() is unreliable here: while another encoded output
+    // (e.g. a simultaneous recording, even on a fully separate encoder) is
+    // still bound to the shared video pipeline, it can keep reporting true
+    // indefinitely even after OBS has already fired "stop" with
+    // OBS_OUTPUT_SUCCESS and logged this output's own final frame stats -
+    // confirmed by tracing while validating #42. The "stop" signal itself,
+    // which just satisfied the wait above, is the authoritative source for
+    // whether this output actually finished; trust it instead of retrying
+    // or waiting on active() again.
+    release_resources(/* trust_confirmed_stop */ true);
     return {CASTOR_ENGINE_OK, {}};
 }
 
@@ -385,7 +390,7 @@ void streaming_subsystem::on_event(streaming_event event, streaming_stop_reason 
     }
 }
 
-void streaming_subsystem::release_resources() noexcept
+void streaming_subsystem::release_resources(bool trust_confirmed_stop) noexcept
 {
     void* output = nullptr;
     void* service = nullptr;
@@ -398,7 +403,7 @@ void streaming_subsystem::release_resources() noexcept
     }
     if (output != nullptr)
     {
-        if (backend_.active(output))
+        if (!trust_confirmed_stop && backend_.active(output))
         {
             std::scoped_lock lock(mutex_);
             output_ = output;

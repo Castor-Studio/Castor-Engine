@@ -202,6 +202,14 @@ namespace Castor.Engine.Interop
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeEngineRenderStats
+    {
+        internal uint StructSize;
+        internal ulong TotalFrames;
+        internal ulong LaggedFrames;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     internal struct NativeEngineDisplayInfo
     {
         internal uint StructSize;
@@ -498,6 +506,13 @@ namespace Castor.Engine.Interop
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial NativeEngineResult GetStreamingHealth(
             ref NativeEngineStreamingHealth health);
+
+        [LibraryImport(
+            LibraryName,
+            EntryPoint = "castor_engine_get_render_stats")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial NativeEngineResult GetRenderStats(
+            ref NativeEngineRenderStats stats);
 
         [LibraryImport(
             LibraryName,

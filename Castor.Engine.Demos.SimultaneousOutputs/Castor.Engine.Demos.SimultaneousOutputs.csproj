@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Castor.Engine\Castor.Engine.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <CastorRuntimeRoot>$(MSBuildThisFileDirectory)..\artifacts\runtime\win-x64</CastorRuntimeRoot>
+    <CastorHostPath>$(CastorRuntimeRoot)\bin\Castor.Engine.Host.dll</CastorHostPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None
+      Include="$(CastorHostPath)"
+      Condition="Exists('$(CastorHostPath)')">
+      <Link>Castor.Engine.Host.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None
+      Include="$(CastorRuntimeRoot)\bin\*"
+      Condition="Exists('$(CastorRuntimeRoot)\bin')">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None
+      Include="$(CastorRuntimeRoot)\obs-plugins\**\*"
+      Condition="Exists('$(CastorRuntimeRoot)\obs-plugins')">
+      <Link>obs-plugins\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None
+      Include="$(CastorRuntimeRoot)\data\**\*"
+      Condition="Exists('$(CastorRuntimeRoot)\data')">
+      <Link>data\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="ValidateCastorHostRuntime" BeforeTargets="Build">
+    <Error
+      Condition="!Exists('$(CastorHostPath)')"
+      Text="Castor.Engine.Host.dll was not found at: $(CastorHostPath). Build and install the native engine first (see README)." />
+  </Target>
+
+</Project>

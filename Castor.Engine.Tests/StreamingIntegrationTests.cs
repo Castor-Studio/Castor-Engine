@@ -69,15 +69,28 @@ namespace Castor.Engine.Tests
             Assert.Contains("StreamingReconfigurationWhileActive", Assert.Throws<InvalidOperationException>(
                 () => EngineRuntime.ConfigureStreaming(
                     new EngineStreamingConfiguration(server!, key + "-replacement"))).Message);
-            Assert.Contains("StreamingConflictingOutputActive", Assert.Throws<InvalidOperationException>(
-                () => EngineRuntime.StartRecording(
-                    new EngineRecordingConfiguration(Path.Combine(Path.GetTempPath(), "stream-conflict.mkv")))).Message);
+
+            // Recording and streaming are no longer mutually exclusive:
+            // starting a recording while streaming is live must succeed.
+            // Streaming already owns the primary encoders configured above,
+            // so recording auto-configures its own isolated secondary pair
+            // instead of sharing them - see castor_engine.cpp's
+            // encoder_slot tracking.
+            var recordingPath = Path.Combine(Path.GetTempPath(), $"stream-and-record-{Guid.NewGuid():N}.mkv");
+            EngineRuntime.StartRecording(new EngineRecordingConfiguration(recordingPath));
+            Assert.True(EngineRuntime.IsRecordingActive);
 
             await Task.Delay(TimeSpan.FromSeconds(3));
 
             var health = EngineRuntime.GetStreamingHealth();
             Assert.True(health.TotalFrames > 0);
             Assert.InRange(health.DroppedFrameRatio, 0, 0.05);
+
+            EngineRuntime.StopRecording();
+            Assert.False(EngineRuntime.IsRecordingActive);
+            Assert.True(File.Exists(recordingPath));
+            Assert.True(new FileInfo(recordingPath).Length > 0);
+            File.Delete(recordingPath);
 
             EngineRuntime.StopStreaming();
             Assert.Equal(EngineStreamingState.Idle, EngineRuntime.GetStreamingStatus().State);
